@@ -1,65 +1,88 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import { useEffect, useState } from "react";
+
+export default function AdminDashboard() {
+  const [clients, setClients] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/clients")
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data)) {
+          setClients(data);
+        }
+      })
+      .finally(() => setLoading(false));
+  }, []);
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+    <div className="min-h-screen bg-slate-950 text-slate-50 p-8">
+      <div className="max-w-7xl mx-auto space-y-8">
+        <header className="flex justify-between items-center bg-slate-900 p-6 rounded-2xl border border-slate-800 shadow-xl">
+          <div>
+            <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">
+              Freelance Payment Tracker
+            </h1>
+            <p className="text-slate-400 mt-2">Manage your clients and payments easily.</p>
+          </div>
+          <button className="bg-indigo-600 hover:bg-indigo-500 transition-colors px-6 py-3 rounded-lg font-medium shadow-lg shadow-indigo-500/20">
+            + Yeni Müşteri
+          </button>
+        </header>
+
+        <main className="bg-slate-900 rounded-2xl border border-slate-800 p-6 shadow-xl overflow-hidden">
+          {loading ? (
+            <div className="flex justify-center items-center h-64 text-indigo-400">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500"></div>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm whitespace-nowrap">
+                <thead className="bg-slate-800/50 text-slate-300 uppercase font-semibold text-xs tracking-wider">
+                  <tr>
+                    <th className="p-4 rounded-tl-lg">Müşteri</th>
+                    <th className="p-4">Proje</th>
+                    <th className="p-4">Tutar</th>
+                    <th className="p-4">Durum</th>
+                    <th className="p-4 rounded-tr-lg">İşlem</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/50">
+                  {clients.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="p-8 text-center text-slate-500">
+                        Henüz kayıtlı müşteri yok.
+                      </td>
+                    </tr>
+                  ) : (
+                    clients.map((client) => (
+                      <tr key={client.id} className="hover:bg-slate-800/30 transition-colors">
+                        <td className="p-4 font-medium">{client.name}</td>
+                        <td className="p-4 text-slate-400">{client.projectName}</td>
+                        <td className="p-4">
+                          <span className="bg-emerald-500/10 text-emerald-400 px-3 py-1 rounded-full font-medium">
+                            {client.agreedAmount} {client.currency}
+                          </span>
+                        </td>
+                        <td className="p-4">
+                          <span className="bg-blue-500/10 text-blue-400 px-3 py-1 rounded-full font-medium text-xs">
+                            {client.status}
+                          </span>
+                        </td>
+                        <td className="p-4 text-indigo-400 cursor-pointer hover:text-indigo-300">
+                          Detaylar
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </main>
+      </div>
     </div>
   );
 }
