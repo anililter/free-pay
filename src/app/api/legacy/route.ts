@@ -29,48 +29,54 @@ export async function GET(req: NextRequest) {
     }
 
     if (api === 'list') {
-      const period = url.searchParams.get('period');
-      const allClients = await db.select().from(clients).orderBy(asc(clients.paymentDay));
+      const period = url.searchParams.get('period') || new Date().toISOString().substring(0, 7);
       
-      const allPayments = period 
-        ? await db.select().from(payments).where(eq(payments.period, period))
-        : await db.select().from(payments);
+      const parts = period.split('-');
+      const y = parseInt(parts[0], 10);
+      const m = parseInt(parts[1], 10);
+      const lastDay = new Date(y, m, 0).getDate();
+      const periodEnd = `${period}-${String(lastDay).padStart(2, '0')}`;
       
-      const formattedClients = allClients.map(c => ({
-        client_id: c.id,
-        client_name: c.name,
-        project_name: c.projectName,
-        agreed_amount: c.agreedAmount,
-        currency: c.currency,
-        payment_day: c.paymentDay,
-        payment_type: c.paymentType,
-        default_account_info: c.accountInfo,
-        client_status: c.status,
-        start_date: c.startDate,
-        client_notes: c.notes,
-        source: c.source,
-        referred_by_id: c.referredById
-      }));
-
-      const formattedPayments = allPayments.map(p => ({
-        payment_id: p.id,
-        client_id: p.clientId,
-        payment_date: p.paidDate,
-        amount_paid: p.amount,
-        currency: p.currency,
-        status: p.status,
-        payment_type: 'Havale/EFT',
-        notes: p.periodNotes,
-        account_info: p.accountInfo,
-        payment_period: p.period,
-        receipt_url: '',
-        is_carried_over: 0,
-        carried_from_period: null
-      }));
+      const activeClients = await db.select().from(clients)
+        .where(and(eq(clients.status, 'aktif'), sql`${clients.startDate} <= ${periodEnd}`))
+        .orderBy(asc(clients.paymentDay));
+      
+      const allPayments = await db.select().from(payments).where(eq(payments.period, period));
+      
+      const paymentsMap = new Map();
+      for (const p of allPayments) {
+        paymentsMap.set(p.clientId, p);
+      }
+      
+      const formattedPayments = [];
+      for (const c of activeClients) {
+        const payment = paymentsMap.get(c.id);
+        const dueDate = `${period}-${String(c.paymentDay).padStart(2, '0')}`;
+        
+        formattedPayments.push({
+          client_id: c.id,
+          client_name: c.name,
+          project_name: c.projectName,
+          agreed_amount: c.agreedAmount,
+          currency: c.currency,
+          payment_day: c.paymentDay,
+          account_info: payment ? (payment.accountInfo || c.accountInfo) : c.accountInfo,
+          payment_id: payment ? payment.id : null,
+          amount: c.agreedAmount,
+          paid_amount: payment ? payment.amount : null,
+          status: payment ? payment.status : 'pending',
+          paid_date: payment ? payment.paidDate : null,
+          period_notes: payment ? payment.periodNotes : '',
+          due_date: payment ? payment.dueDate : dueDate,
+          period: period,
+          source: c.source || 'Direct',
+          referred_by_id: c.referredById || null
+        });
+      }
 
       return NextResponse.json({ 
         success: true, 
-        clients: formattedClients, 
+        clients: activeClients, 
         data: formattedPayments,
         account_options: [],
         monthly_stats: { labels: [], datasets: [] },
