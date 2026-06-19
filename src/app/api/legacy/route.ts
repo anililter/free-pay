@@ -585,6 +585,9 @@ export async function POST(req: NextRequest) {
         case 'paid_date':
           updates.paidDate = value || null;
           break;
+        case 'due_date':
+          updates.dueDate = value || null;
+          break;
         case 'period_notes':
           updates.periodNotes = value ?? null;
           break;
