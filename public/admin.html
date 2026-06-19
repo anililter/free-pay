@@ -978,11 +978,10 @@
                             <th width="8%" style="text-align: center;"><i data-lucide="check-square" style="width: 14px; height: 14px;"></i></th>
                             <th width="12%">Ödeme Yeri / Hesap</th>
                             <th width="18%">Müşteri & Marka</th>
-                            <th width="10%">Durum</th>
+                            <th width="17%">Durum</th>
                             <th width="10%">Anlaşılan</th>
                             <th width="10%">Ödenen Tutar</th>
                             <th width="11%">Ödeme Tarihi</th>
-                            <th width="7%">Vade</th>
                             <th width="12%">Ödeme Notu</th>
                         </tr>
                     </thead>
@@ -2119,7 +2118,7 @@
                     const groupId = `group_${p.client_id}`;
                     tbody.insertAdjacentHTML('beforeend', `
                         <tr class="row-group-header collapsed" id="${groupId}" onclick="toggleGroup('${groupId}')">
-                            <td colspan="9" style="padding: 8px 16px;">
+                            <td colspan="8" style="padding: 8px 16px;">
                                 <div style="display:flex; align-items:center; gap:10px;">
                                     <i data-lucide="chevron-right" style="width:14px;height:14px;color:#f87171;" id="${groupId}_icon"></i>
                                     <span style="font-weight:800; color:#f87171; font-size:13px;">${escapeHtml(p.client_name)}</span>
@@ -2199,10 +2198,18 @@
                             <div style="font-size:11px; color:hsl(var(--text-secondary)); margin-top:2px;">${escapeHtml(p.project_name)}</div>
                         </td>
                         <td>
-                            <span class="status-badge ${badgeClass}">
-                                <i data-lucide="clock" style="width:10px;height:10px;"></i>
-                                <span style="margin-left: 4px;">${badgeLabel}: ${relativeDateBadge}</span>
-                            </span>
+                            <div style="display:flex; flex-direction:column; gap:6px;">
+                                <span class="status-badge ${badgeClass}">
+                                    <i data-lucide="clock" style="width:10px;height:10px;"></i>
+                                    <span style="margin-left: 4px;">${badgeLabel}: ${relativeDateBadge}</span>
+                                </span>
+                                <div style="display:flex; align-items:center; gap:4px;">
+                                    <input type="date" class="table-input" value="${p.due_date || ''}" 
+                                           title="Vade (Hedef) Tarihini Değiştir"
+                                           style="font-size: 10px; padding: 2px 4px; width: 100px; color:hsl(var(--text-secondary)); border: 1px dashed transparent;"
+                                           onchange="onInlineEdit(${p.client_id}, '${p.period}', 'due_date', this)">
+                                </div>
+                            </div>
                         </td>
                         <td>
                             <div style="font-weight: 700; color:hsl(var(--text-secondary));">${formatCurrency(p.agreed_amount, p.currency)}</div>
@@ -2233,12 +2240,6 @@
                             <input type="date" class="table-input" value="${p.paid_date || ''}" 
                                    style="font-size: 11px; padding: 4px 6px;"
                                    onchange="onInlineEdit(${p.client_id}, '${p.period}', 'paid_date', this)">
-                        </td>
-                        <td>
-                            <input type="date" class="table-input" value="${p.due_date || ''}" 
-                                   style="font-size: 11px; padding: 4px 6px; width: 110px;"
-                                   onchange="onInlineEdit(${p.client_id}, '${p.period}', 'due_date', this)">
-                            <div style="font-size:10px; color:hsl(var(--text-muted)); margin-top:4px; text-align: center;">(Gün: ${p.payment_day})</div>
                         </td>
                         <td>
                             <input type="text" class="table-input" value="${escapeHtml(p.period_notes || '')}" 
