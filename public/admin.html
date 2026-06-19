@@ -1930,7 +1930,23 @@
                 const isPartial = p.status === 'partial';
                 const isOverdue = (p.status === 'pending' || p.status === 'partial') && p.due_date < todayStr;
                 
-                totalExpected += amount;
+                let includeInExpected = false;
+                if (p.period === curPeriod) {
+                    includeInExpected = true;
+                } else {
+                    if (p.due_date) {
+                        const dDate = new Date(p.due_date);
+                        const tDate = new Date(todayStr);
+                        const diffDays = (dDate - tDate) / (1000 * 60 * 60 * 24);
+                        if (diffDays >= -5 && diffDays <= 5) {
+                            includeInExpected = true;
+                        }
+                    }
+                }
+
+                if (includeInExpected) {
+                    totalExpected += amount;
+                }
                 
                 if (isPaid) {
                     totalPaid += amount;
@@ -3242,41 +3258,58 @@
         // PAYMENT MODAL LOGIC
         // ==========================================
         window.openPaymentModal = function(clientId, period) {
-            const p = allPayments.find(item => item.client_id === clientId && item.period === period);
-            if (!p) return;
+            try {
+                console.log('openPaymentModal called:', clientId, period);
+                const p = allPayments.find(item => item.client_id == clientId && item.period == period);
+                if (!p) {
+                    console.error('Payment record not found for', clientId, period);
+                    showToast('Ödeme kaydı bulunamadı', 'danger');
+                    return;
+                }
 
-            document.getElementById('pmClientId').value = clientId;
-            document.getElementById('pmPeriod').value = period;
-            
-            document.getElementById('paymentModalTitle').textContent = `${p.client_name} - ${formatPeriodBadge(period)}`;
-            document.getElementById('pmAgreedAmount').textContent = formatCurrency(p.agreed_amount, p.currency);
-            document.getElementById('pmCurrency').textContent = p.currency === 'TRY' ? '₺' : (p.currency === 'USD' ? '$' : '€');
+                document.getElementById('pmClientId').value = clientId;
+                document.getElementById('pmPeriod').value = period;
+                
+                document.getElementById('paymentModalTitle').textContent = `${p.client_name} - ${formatPeriodBadge(period)}`;
+                document.getElementById('pmAgreedAmount').textContent = formatCurrency(p.agreed_amount, p.currency);
+                document.getElementById('pmCurrency').textContent = p.currency === 'TRY' ? '₺' : (p.currency === 'USD' ? '$' : '€');
 
-            // Set default amount
-            let defaultAmount = p.agreed_amount;
-            if (p.paid_amount > 0 && p.status === 'partial') {
-                defaultAmount = p.agreed_amount - p.paid_amount; // Suggest remaining
-            } else if (p.status === 'paid' && p.paid_amount > 0) {
-                defaultAmount = p.paid_amount;
+                // Set default amount
+                let defaultAmount = p.agreed_amount;
+                if (p.paid_amount > 0 && p.status === 'partial') {
+                    defaultAmount = p.agreed_amount - p.paid_amount; // Suggest remaining
+                } else if (p.status === 'paid' && p.paid_amount > 0) {
+                    defaultAmount = p.paid_amount;
+                }
+                document.getElementById('pmPaidAmount').value = defaultAmount;
+
+                // Set default date
+                if (p.paid_date) {
+                    document.getElementById('pmPaidDate').value = p.paid_date;
+                } else {
+                    document.getElementById('pmPaidDate').value = new Date().toISOString().split('T')[0];
+                }
+
+                // Carry over button visibility
+                const carryBtn = document.getElementById('pmCarryOverBtn');
+                if (carryBtn) {
+                    if (p.status === 'paid') {
+                        carryBtn.style.display = 'none';
+                    } else {
+                        carryBtn.style.display = 'inline-flex';
+                    }
+                }
+
+                const modal = document.getElementById('paymentModal');
+                if (modal) {
+                    modal.classList.add('show');
+                } else {
+                    console.error('paymentModal element not found');
+                }
+            } catch (err) {
+                console.error('Error in openPaymentModal:', err);
+                alert('Modal açılırken hata oluştu: ' + err.message);
             }
-            document.getElementById('pmPaidAmount').value = defaultAmount;
-
-            // Set default date
-            if (p.paid_date) {
-                document.getElementById('pmPaidDate').value = p.paid_date;
-            } else {
-                document.getElementById('pmPaidDate').value = new Date().toISOString().split('T')[0];
-            }
-
-            // Carry over button visibility
-            const carryBtn = document.getElementById('pmCarryOverBtn');
-            if (p.status === 'paid') {
-                carryBtn.style.display = 'none';
-            } else {
-                carryBtn.style.display = 'inline-flex';
-            }
-
-            document.getElementById('paymentModal').classList.add('show');
         };
 
         window.closePaymentModal = function() {
