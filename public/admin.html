@@ -1661,7 +1661,7 @@
             select.innerHTML = '<option value="">Müşteri Yükleniyor...</option>';
             
             try {
-                const response = await fetch(apiBase + 'index.php?api=clients_list');
+                const response = await fetch('/api/legacy?api=clients_list');
                 const result = await response.json();
                 if (result.success) {
                     select.innerHTML = '<option value="">-- Lütfen Seçin --</option>';
@@ -1693,7 +1693,7 @@
             output.textContent = '';
 
             try {
-                const response = await fetch(apiBase + 'index.php?api=gemini_analyze');
+                const response = await fetch('/api/legacy?api=gemini_analyze');
                 const result = await response.json();
                 if (result.success) {
                     resultBox.style.display = 'block';
@@ -1805,7 +1805,7 @@
         // Fetch data
         async function loadAllData() {
             try {
-                const response = await fetch(apiBase + 'index.php?api=clients_list');
+                const response = await fetch('/api/legacy?api=clients_list');
                 const result = await response.json();
                 if (result.success) {
                     allClients = result.data;
@@ -1827,7 +1827,7 @@
             const period = document.getElementById('filterPeriod').value;
             selectedPeriod = period;
             try {
-                const response = await fetch(`${apiBase}index.php?api=list&period=${period}`);
+                const response = await fetch(`/api/legacy?api=list&period=${period}`);
                 const result = await response.json();
                 if (result.success) {
                     allPayments = result.data;
@@ -2374,7 +2374,7 @@
         window.carryOver = async function(clientId, period) {
             if (!confirm(`${period} döneminin kalan tutarı sonraki aya devredilsin mi?`)) return;
             try {
-                const response = await fetch(apiBase + 'index.php?api=carry_over', {
+                const response = await fetch('/api/legacy?api=carry_over', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({ client_id: clientId, period: period })
@@ -2465,7 +2465,7 @@
 
         async function loadSettings() {
             try {
-                const response = await fetch(apiBase + 'index.php?api=settings_get');
+                const response = await fetch('/api/legacy?api=settings_get');
                 const result = await response.json();
                 if (result.success) {
                     const data = result.data;
@@ -2501,7 +2501,7 @@
             };
 
             try {
-                const response = await fetch(apiBase + 'index.php?api=settings_save', {
+                const response = await fetch('/api/legacy?api=settings_save', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(config)
@@ -2521,7 +2521,7 @@
         window.downloadDatabaseBackup = function() {
             const dateInput = document.getElementById('backupDate');
             const dateVal = dateInput.value || new Date().toISOString().split('T')[0];
-            window.location.href = apiBase + 'index.php?api=backup_download&date=' + encodeURIComponent(dateVal);
+            window.location.href = '/api/legacy?api=backup_download&date=' + encodeURIComponent(dateVal);
         };
 
         window.restoreDatabaseBackup = async function() {
@@ -2546,7 +2546,7 @@
             formData.append('backup_file', file);
 
             try {
-                const response = await fetch(apiBase + 'index.php?api=backup_restore', {
+                const response = await fetch('/api/legacy?api=backup_restore', {
                     method: 'POST',
                     body: formData
                 });
@@ -2572,7 +2572,7 @@
             btnEl.textContent = 'Gönderiliyor...';
 
             try {
-                const response = await fetch(apiBase + 'index.php?api=backup_email_manual', {
+                const response = await fetch('/api/legacy?api=backup_email_manual', {
                     method: 'POST'
                 });
                 const result = await response.json();
@@ -2608,13 +2608,13 @@
                     smtp_pass: document.getElementById('settingsSmtpPass').value
                 };
 
-                await fetch(apiBase + 'index.php?api=settings_save', {
+                await fetch('/api/legacy?api=settings_save', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(config)
                 });
 
-                const response = await fetch(apiBase + 'index.php?api=settings_test_email');
+                const response = await fetch('/api/legacy?api=settings_test_email');
                 const result = await response.json();
                 if (result.success) {
                     showToast('Test e-postası başarıyla gönderildi!', 'success');
@@ -2640,7 +2640,7 @@
             btn.innerHTML = '<span class="spinner-icon"></span> Gönderiliyor...';
 
             try {
-                const response = await fetch(apiBase + 'index.php?api=settings_trigger_reminders');
+                const response = await fetch('/api/legacy?api=settings_trigger_reminders');
                 const result = await response.json();
                 if (result.success) {
                     if (result.sent) {
@@ -2665,7 +2665,7 @@
             try {
                 element.style.borderColor = 'hsl(var(--primary))';
                 
-                const response = await fetch(apiBase + 'index.php?api=save_inline', {
+                const response = await fetch('/api/legacy?api=save_inline', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -2695,7 +2695,7 @@
         // Save inline and redraw (for checkbox toggle / date changes)
         window.saveInline = async function(clientId, period, field, value) {
             try {
-                const response = await fetch(apiBase + 'index.php?api=save_inline', {
+                const response = await fetch('/api/legacy?api=save_inline', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -2791,7 +2791,7 @@
             const todayStr = new Date().toISOString().split('T')[0];
             const promises = Array.from(selectedPayments).map(key => {
                 const [clientId, period] = key.split('_');
-                return fetch(apiBase + 'index.php?api=save_inline', {
+                return fetch('/api/legacy?api=save_inline', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -2832,7 +2832,7 @@
             
             const promises = Array.from(selectedPayments).map(key => {
                 const [clientId, period] = key.split('_');
-                return fetch(apiBase + 'index.php?api=save_inline', {
+                return fetch('/api/legacy?api=save_inline', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -2877,7 +2877,7 @@
             }
             
             try {
-                const response = await fetch(apiBase + 'index.php?api=save_inline', {
+                const response = await fetch('/api/legacy?api=save_inline', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -3161,7 +3161,7 @@
             };
 
             const isEdit = !!id;
-            const endpoint = isEdit ? apiBase + 'index.php?api=client_update' : apiBase + 'index.php?api=client_create';
+            const endpoint = isEdit ? '/api/legacy?api=client_update' : '/api/legacy?api=client_create';
 
             try {
                 const response = await fetch(endpoint, {
@@ -3191,7 +3191,7 @@
             if (!confirm(`"${c.name}" müşterisini silmek istediğinizden emin misiniz?`)) return;
 
             try {
-                const response = await fetch(apiBase + 'index.php?api=client_delete', {
+                const response = await fetch('/api/legacy?api=client_delete', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ id })
