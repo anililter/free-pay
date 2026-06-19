@@ -876,7 +876,7 @@
             
             <div class="db-status">
                 <span class="dot" style="background-color:hsl(var(--success)); width:8px; height:8px; border-radius:50%; display:inline-block; margin-right:6px;"></span>
-                <span><?php echo ($db_type === 'pgsql' ? 'PostgreSQL' : ($db_type === 'mysql' ? 'MySQL' : 'SQLite')); ?> Bağlantısı Aktif</span>
+                <span>Turso DB Bağlantısı Aktif</span>
             </div>
         </header>
 
@@ -894,11 +894,11 @@
                 <i data-lucide="handshake" style="width: 15px; height: 15px;"></i>
                 <span>Müşteriler & Anlaşmalar</span>
             </button>
-            <button class="tab-btn" onclick="switchTab('settings', this)">
+            <button class="tab-btn" onclick="switchTab('settings', this)" style="display:none;">
                 <i data-lucide="settings" style="width: 15px; height: 15px;"></i>
                 <span>E-posta Ayarları</span>
             </button>
-            <button class="tab-btn" onclick="switchTab('gemini', this)">
+            <button class="tab-btn" onclick="switchTab('gemini', this)" style="display:none;">
                 <i data-lucide="sparkles" style="width: 15px; height: 15px;"></i>
                 <span>Gemini Yapay Zeka</span>
             </button>
@@ -941,9 +941,9 @@
                         <input type="text" id="searchClient" class="form-control search-control" placeholder="Müşteri veya not ara...">
                     </div>
                     
-                    <select id="filterPeriod" class="form-control" onchange="loadPaymentsList()">
-                        <!-- Dynamic Period Options -->
-                    </select>
+                    <input type="month" id="filterPeriodStart" class="form-control" onchange="loadPaymentsList()" style="width: 160px;">
+                    <span style="color: hsl(var(--text-muted)); font-size: 12px; font-weight: 600;">—</span>
+                    <input type="month" id="filterPeriodEnd" class="form-control" onchange="loadPaymentsList()" style="width: 160px;">
 
                     <select id="filterStatus" class="form-control" onchange="renderTable()">
                         <option value="unpaid" selected>Ödenmeyenler (Geciken & Yaklaşan)</option>
@@ -960,10 +960,10 @@
                 </div>
                 
                 <div class="filter-group">
-                    <button class="btn btn-secondary" onclick="changeMonth(-1)" title="Önceki Ay">
+                    <button class="btn btn-secondary" onclick="shiftRange(-1)" title="Önceki Ay">
                         <i data-lucide="chevron-left" style="width: 15px; height: 15px;"></i>
                     </button>
-                    <button class="btn btn-secondary" onclick="changeMonth(1)" title="Sonraki Ay">
+                    <button class="btn btn-secondary" onclick="shiftRange(1)" title="Sonraki Ay">
                         <i data-lucide="chevron-right" style="width: 15px; height: 15px;"></i>
                     </button>
                 </div>
@@ -1431,6 +1431,12 @@
                     </div>
 
                     <div class="form-group">
+                        <label class="form-label" for="fieldGracePeriod">Ödeme Tolerans Süresi (Gün) *</label>
+                        <input type="number" id="fieldGracePeriod" class="form-control" min="0" max="30" value="5" placeholder="Örn. 5" required>
+                        <small style="font-size:10px; color:hsl(var(--text-muted)); margin-top:2px;">Vade tarihinden sonra kaç gün tolerans tanınacak</small>
+                    </div>
+
+                    <div class="form-group">
                         <label class="form-label" for="fieldPaymentType">Ödeme Şekli *</label>
                         <select id="fieldPaymentType" class="form-control" required>
                             <option value="upfront">Önden (Dönem Başı)</option>
@@ -1593,9 +1599,16 @@
             const now = new Date();
             const year = now.getFullYear();
             const month = String(now.getMonth() + 1).padStart(2, '0');
-            selectedPeriod = `${year}-${month}`;
+            // Default range: previous month start → current month end (shows overdue + current)
+            const prevMonth = now.getMonth() === 0 ? 12 : now.getMonth();
+            const prevYear = now.getMonth() === 0 ? year - 1 : year;
+            const startPeriod = `${prevYear}-${String(prevMonth).padStart(2, '0')}`;
+            const endPeriod = `${year}-${month}`;
+            
+            document.getElementById('filterPeriodStart').value = startPeriod;
+            document.getElementById('filterPeriodEnd').value = endPeriod;
+            selectedPeriod = endPeriod;
 
-            buildPeriodDropdowns();
             loadAllData();
             
             document.getElementById('searchClient').addEventListener('input', renderTable);
@@ -1762,44 +1775,23 @@
             });
         };
 
-        function buildPeriodDropdowns() {
-            const select = document.getElementById('filterPeriod');
-            select.innerHTML = '';
+        // No longer needed — using native month inputs
+        function buildPeriodDropdowns() {}
+
+        window.shiftRange = function(direction) {
+            const startInput = document.getElementById('filterPeriodStart');
+            const endInput = document.getElementById('filterPeriodEnd');
             
-            const now = new Date();
-            const currentYear = now.getFullYear();
-            
-            const periods = [];
-            for (let year = currentYear - 1; year <= currentYear + 1; year++) {
-                for (let month = 1; month <= 12; month++) {
-                    const mStr = String(month).padStart(2, '0');
-                    periods.push(`${year}-${mStr}`);
-                }
+            function shiftMonth(val, dir) {
+                const [y, m] = val.split('-').map(Number);
+                const d = new Date(y, m - 1 + dir, 1);
+                return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
             }
             
-            periods.sort().reverse();
-            
-            periods.forEach(p => {
-                const opt = document.createElement('option');
-                opt.value = p;
-                const [year, m] = p.split('-');
-                opt.textContent = `${TURKISH_MONTHS[m]} ${year}`;
-                select.appendChild(opt);
-            });
-
-            select.value = selectedPeriod;
-        }
-
-        window.changeMonth = function(direction) {
-            const select = document.getElementById('filterPeriod');
-            const currentIndex = select.selectedIndex;
-            const newIndex = currentIndex - direction; // reversed sort
-            
-            if (newIndex >= 0 && newIndex < select.options.length) {
-                select.selectedIndex = newIndex;
-                selectedPeriod = select.value;
-                loadPaymentsList();
-            }
+            startInput.value = shiftMonth(startInput.value, direction);
+            endInput.value = shiftMonth(endInput.value, direction);
+            selectedPeriod = endInput.value;
+            loadPaymentsList();
         };
 
         // Fetch data
@@ -1824,10 +1816,11 @@
             if (typeof clearSelection === 'function') {
                 clearSelection();
             }
-            const period = document.getElementById('filterPeriod').value;
-            selectedPeriod = period;
+            const periodStart = document.getElementById('filterPeriodStart').value;
+            const periodEnd = document.getElementById('filterPeriodEnd').value;
+            selectedPeriod = periodEnd;
             try {
-                const response = await fetch(`/api/legacy?api=list&period=${period}`);
+                const response = await fetch(`/api/legacy?api=list&period_start=${periodStart}&period_end=${periodEnd}`);
                 const result = await response.json();
                 if (result.success) {
                     allPayments = result.data;
@@ -1953,7 +1946,7 @@
         }
 
         // Relative Date badge calculation
-        function getRelativeDateStr(dateStr, status) {
+        function getRelativeDateStr(dateStr, status, graceDays) {
             if (!dateStr) return '';
             const today = new Date();
             today.setHours(0,0,0,0);
@@ -1970,16 +1963,22 @@
                 return `${formattedDate} (Ödendi)`;
             }
 
+            const effectiveGrace = graceDays || 0;
+
             if (diffDays < 0) {
                 const absDays = Math.abs(diffDays);
-                if (absDays >= 7 && absDays < 30) {
-                    const weeks = Math.floor(absDays / 7);
-                    return `${weeks} hafta önce`;
-                } else if (absDays >= 30) {
-                    const monthsDiff = Math.floor(absDays / 30);
-                    return `${monthsDiff} ay önce`;
+                if (absDays <= effectiveGrace) {
+                    return `${absDays} gün (toleransta)`;
                 }
-                return `${absDays} gün gecikti`;
+                const realDelay = absDays - effectiveGrace;
+                if (realDelay >= 7 && realDelay < 30) {
+                    const weeks = Math.floor(realDelay / 7);
+                    return `${weeks} hafta gecikti`;
+                } else if (realDelay >= 30) {
+                    const monthsDiff = Math.floor(realDelay / 30);
+                    return `${monthsDiff} ay gecikti`;
+                }
+                return `${realDelay} gün gecikti`;
             } else if (diffDays === 0) {
                 return 'Bugün';
             } else if (diffDays === 1) {
@@ -2039,7 +2038,7 @@
                 const matchesAccount = accountVal === 'all' || p.account_info === accountVal;
                 
                 let matchesStatus = true;
-                const isOverdue = p.status === 'pending' && p.due_date < todayStr;
+                const isOverdue = (p.status === 'pending' || p.status === 'partial') && p.due_date < todayStr;
                 const isPaid = p.status === 'paid';
                 const isUpcoming = p.status === 'pending' && p.due_date >= todayStr && (!periodEndStr || p.due_date <= periodEndStr);
                 
@@ -2051,8 +2050,18 @@
                 return matchesSearch && matchesAccount && matchesStatus;
             });
 
-            // Sort chronologically by due_date ASC (closest/past-due first at the top)
+            // Sort: overdue first (oldest overdue at top), then upcoming by nearest due date
             filtered.sort((a, b) => {
+                const aIsOverdue = (a.status !== 'paid') && a.due_date < todayStr;
+                const bIsOverdue = (b.status !== 'paid') && b.due_date < todayStr;
+                const aIsPaid = a.status === 'paid';
+                const bIsPaid = b.status === 'paid';
+                // Overdue first, then upcoming, then paid last
+                if (aIsOverdue && !bIsOverdue) return -1;
+                if (!aIsOverdue && bIsOverdue) return 1;
+                if (aIsPaid && !bIsPaid) return 1;
+                if (!aIsPaid && bIsPaid) return -1;
+                // Within same group, sort by due_date
                 const dateCompare = a.due_date.localeCompare(b.due_date);
                 if (dateCompare !== 0) return dateCompare;
                 return a.client_name.localeCompare(b.client_name);
@@ -2132,7 +2141,7 @@
                 else if (isPartial) rowClass = isInGroup ? 'row-overdue group-member' : 'row-overdue';
                 else if (isOverdue) rowClass = isInGroup ? 'row-overdue group-member' : 'row-overdue';
 
-                const relativeDateBadge = getRelativeDateStr(isPaid ? p.paid_date : p.due_date, p.status);
+                const relativeDateBadge = getRelativeDateStr(isPaid ? p.paid_date : p.due_date, p.status, p.grace_period_days);
                 let badgeClass = isPaid ? 'paid' : isPartial ? 'partial' : (isOverdue ? 'overdue' : 'upcoming');
                 let badgeLabel = isPaid ? 'ÖDENDİ' : isPartial ? 'KISMİ' : (isOverdue ? 'GECİKTİ' : 'BEKLİYOR');
 
@@ -2942,18 +2951,18 @@
                     maintainAspectRatio: false,
                     plugins: {
                         legend: {
-                            labels: { color: '#f8fafc', font: { family: 'Plus Jakarta Sans', weight: 600 } }
+                            labels: { color: 'hsl(222, 47%, 11%)', font: { family: 'Plus Jakarta Sans', weight: 600 } }
                         }
                     },
                     scales: {
                         x: {
-                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
-                            ticks: { color: '#94a3b8', font: { family: 'Plus Jakarta Sans', weight: 600 } }
+                            grid: { color: 'rgba(0, 0, 0, 0.06)' },
+                            ticks: { color: 'hsl(215, 16%, 47%)', font: { family: 'Plus Jakarta Sans', weight: 600 } }
                         },
                         y: {
-                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                            grid: { color: 'rgba(0, 0, 0, 0.06)' },
                             ticks: { 
-                                color: '#94a3b8', 
+                                color: 'hsl(215, 16%, 47%)', 
                                 font: { family: 'Plus Jakarta Sans', weight: 600 },
                                 callback: function(value) { return value.toLocaleString('tr-TR') + ' ₺'; }
                             }
@@ -2994,7 +3003,7 @@
                         data: displayData,
                         backgroundColor: colors.slice(0, accountLabels.length),
                         borderWidth: 1,
-                        borderColor: '#1e293b'
+                        borderColor: 'hsl(214, 32%, 91%)'
                     }]
                 },
                 options: {
@@ -3003,7 +3012,7 @@
                     plugins: {
                         legend: {
                             position: 'bottom',
-                            labels: { color: '#f8fafc', font: { family: 'Plus Jakarta Sans', weight: 600 } }
+                            labels: { color: 'hsl(222, 47%, 11%)', font: { family: 'Plus Jakarta Sans', weight: 600 } }
                         },
                         tooltip: {
                             callbacks: {
@@ -3119,6 +3128,7 @@
                 document.getElementById('fieldStartDate').value = c.start_date;
                 document.getElementById('fieldClientStatus').value = c.status;
                 document.getElementById('fieldClientNotes').value = c.notes || '';
+                document.getElementById('fieldGracePeriod').value = c.grace_period_days || 5;
             } else {
                 document.getElementById('clientModalTitle').textContent = 'Yeni Müşteri Anlaşması Ekle';
                 document.getElementById('fieldClientId').value = '';
@@ -3128,6 +3138,7 @@
                 document.getElementById('fieldAgreementDate').value = today;
                 document.getElementById('fieldStartDate').value = today;
                 document.getElementById('fieldClientStatus').value = 'aktif';
+                document.getElementById('fieldGracePeriod').value = 5;
             }
 
             document.getElementById('clientModal').classList.add('show');
@@ -3153,11 +3164,12 @@
             const agreement_date = document.getElementById('fieldAgreementDate').value;
             const start_date = document.getElementById('fieldStartDate').value;
             const notes = document.getElementById('fieldClientNotes').value.trim();
+            const grace_period_days = parseInt(document.getElementById('fieldGracePeriod').value) || 5;
 
             const payload = {
                 id: id ? parseInt(id) : null,
                 name, project_name, agreed_amount, currency, payment_day,
-                payment_type, account_info, status, agreement_date, start_date, notes
+                payment_type, account_info, status, agreement_date, start_date, notes, grace_period_days
             };
 
             const isEdit = !!id;

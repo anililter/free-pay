@@ -15,6 +15,8 @@ export const clients = sqliteTable('clients', {
   notes: text('notes'),
   source: text('source').notNull().default('Meta'),
   referredById: integer('referred_by_id'),
+  gracePeriodDays: integer('grace_period_days').notNull().default(5),
+  endDate: text('end_date'),
   createdAt: text('created_at').notNull().$defaultFn(() => new Date().toISOString()),
 });
 
