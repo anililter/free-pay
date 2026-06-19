@@ -29,8 +29,12 @@ export async function GET(req: NextRequest) {
     }
 
     if (api === 'list') {
+      const period = url.searchParams.get('period');
       const allClients = await db.select().from(clients).orderBy(asc(clients.paymentDay));
-      const allPayments = await db.select().from(payments);
+      
+      const allPayments = period 
+        ? await db.select().from(payments).where(eq(payments.period, period))
+        : await db.select().from(payments);
       
       const formattedClients = allClients.map(c => ({
         client_id: c.id,
@@ -64,7 +68,17 @@ export async function GET(req: NextRequest) {
         carried_from_period: null
       }));
 
-      return NextResponse.json({ success: true, clients: formattedClients, payments: formattedPayments });
+      return NextResponse.json({ 
+        success: true, 
+        clients: formattedClients, 
+        data: formattedPayments,
+        account_options: [],
+        monthly_stats: { labels: [], datasets: [] },
+        account_stats: { labels: [], datasets: [] },
+        delay_stats: { delayedAmount: 0, criticalCount: 0 },
+        report_metrics: { totalPaid: 0, expectedTotal: 0, pendingCount: 0 },
+        client_earnings: []
+      });
     }
 
     return NextResponse.json({ success: false, error: 'Unknown API endpoint' }, { status: 400 });
