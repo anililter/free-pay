@@ -1384,6 +1384,8 @@
             </div>
         </div>
 
+    </div>
+
     <!-- MODAL: Tahsilat (Ödeme) -->
     <div class="modal-backdrop" id="paymentModal">
         <div class="modal-card" style="max-width: 450px;">
@@ -3271,13 +3273,13 @@
                 document.getElementById('pmPeriod').value = period;
                 
                 document.getElementById('paymentModalTitle').textContent = `${p.client_name} - ${formatPeriodBadge(period)}`;
-                document.getElementById('pmAgreedAmount').textContent = formatCurrency(p.agreed_amount, p.currency);
+                document.getElementById('pmAgreedAmount').textContent = formatCurrency(p.amount, p.currency);
                 document.getElementById('pmCurrency').textContent = p.currency === 'TRY' ? '₺' : (p.currency === 'USD' ? '$' : '€');
 
                 // Set default amount
-                let defaultAmount = p.agreed_amount;
+                let defaultAmount = p.amount;
                 if (p.paid_amount > 0 && p.status === 'partial') {
-                    defaultAmount = p.agreed_amount - p.paid_amount; // Suggest remaining
+                    defaultAmount = p.amount - p.paid_amount; // Suggest remaining
                 } else if (p.status === 'paid' && p.paid_amount > 0) {
                     defaultAmount = p.paid_amount;
                 }
