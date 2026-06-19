@@ -3,10 +3,11 @@ import { db } from '@/db';
 import { clients } from '@/db/schema';
 import { eq } from 'drizzle-orm';
 
-export async function PUT(req: Request, { params }: { params: { id: string } }) {
+export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const body = await req.json();
-    const clientId = parseInt(params.id);
+    const resolvedParams = await params;
+    const clientId = parseInt(resolvedParams.id);
 
     const updatedClient = await db.update(clients).set({
       name: body.name,
@@ -31,9 +32,10 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
   }
 }
 
-export async function DELETE(req: Request, { params }: { params: { id: string } }) {
+export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const clientId = parseInt(params.id);
+    const resolvedParams = await params;
+    const clientId = parseInt(resolvedParams.id);
     await db.delete(clients).where(eq(clients.id, clientId));
     return NextResponse.json({ success: true });
   } catch (error) {

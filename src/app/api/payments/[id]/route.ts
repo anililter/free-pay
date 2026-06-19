@@ -3,10 +3,11 @@ import { db } from '@/db';
 import { payments } from '@/db/schema';
 import { eq } from 'drizzle-orm';
 
-export async function PUT(req: Request, { params }: { params: { id: string } }) {
+export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const body = await req.json();
-    const paymentId = parseInt(params.id);
+    const resolvedParams = await params;
+    const paymentId = parseInt(resolvedParams.id);
 
     const updatedPayment = await db.update(payments).set({
       status: body.status,
@@ -22,9 +23,10 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
   }
 }
 
-export async function DELETE(req: Request, { params }: { params: { id: string } }) {
+export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const paymentId = parseInt(params.id);
+    const resolvedParams = await params;
+    const paymentId = parseInt(resolvedParams.id);
     await db.delete(payments).where(eq(payments.id, paymentId));
     return NextResponse.json({ success: true });
   } catch (error) {
