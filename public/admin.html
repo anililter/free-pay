@@ -2217,13 +2217,15 @@
                         <td>
                             <div style="display:flex; flex-direction:column; gap:6px;">
                                 <div style="display:flex; align-items:center; gap:6px; background: hsl(var(--bg-base)); padding: 4px; border-radius: 6px; border: 1px solid hsl(var(--border-color));">
-                                    <input type="number" class="table-input" 
-                                           placeholder="Tutar girin..." 
+                                    <input type="number" id="input_amount_${p.client_id}_${p.period}" class="table-input" 
+                                           placeholder="Manuel tutar" 
                                            value="${p.paid_amount != null && p.paid_amount > 0 ? p.paid_amount : ''}" 
-                                           style="width: 80px; text-align: right; border: none; background: transparent; padding: 2px 4px; font-size: 12px; font-weight: 600;"
-                                           onblur="onInlineEdit(${p.client_id}, '${p.period}', 'paid_amount', this)"
-                                           onkeydown="if(event.key === 'Enter') { this.blur(); }">
-                                    <span style="font-size: 11px; color: hsl(var(--text-muted)); font-weight:700; padding-right: 4px;">${p.currency}</span>
+                                           style="width: 70px; text-align: right; border: none; background: transparent; padding: 2px 4px; font-size: 12px; font-weight: 600;"
+                                           onkeydown="if(event.key === 'Enter') { onInlineEdit(${p.client_id}, '${p.period}', 'paid_amount', this); }">
+                                    <span style="font-size: 11px; color: hsl(var(--text-muted)); font-weight:700;">${p.currency}</span>
+                                    <button title="Kaydet" onclick="onInlineEdit(${p.client_id}, '${p.period}', 'paid_amount', document.getElementById('input_amount_${p.client_id}_${p.period}'))" style="background:hsl(var(--primary)); border:none; border-radius:4px; padding:4px; cursor:pointer; color:white; display:flex; align-items:center;">
+                                        <i data-lucide="check" style="width:12px;height:12px;"></i>
+                                    </button>
                                 </div>
                                 ${partialDisplay}
                                 ${!isPaid ? `

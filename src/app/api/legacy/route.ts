@@ -648,7 +648,16 @@ export async function POST(req: NextRequest) {
         case 'status_with_date': {
           try {
             const parsed = JSON.parse(value);
-            if (parsed.status) updates.status = parsed.status;
+            if (parsed.status) {
+              updates.status = parsed.status;
+              // If marking as paid, and it was previously pending (amount=0), auto-fill the full agreed amount
+              if (parsed.status === 'paid') {
+                 const currentAmount = existing.length > 0 ? existing[0].amount : 0;
+                 if (currentAmount <= 0 && client) {
+                    updates.amount = client.agreedAmount;
+                 }
+              }
+            }
             if (parsed.paid_date !== undefined) updates.paidDate = parsed.paid_date;
           } catch {
             return fail('Invalid JSON for status_with_date');
