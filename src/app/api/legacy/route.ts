@@ -28,11 +28,18 @@ function lastDayOfMonth(year: number, month: number): number {
 }
 
 /** Compute due‑date string for a client's paymentDay in a given period. */
-function computeDueDate(period: string, paymentDay: number): string {
-  const [y, m] = period.split('-').map(Number);
+function computeDueDate(period: string, paymentDay: number, paymentType: string = 'upfront'): string {
+  let [y, m] = period.split('-').map(Number);
+  if (paymentType === 'net30') {
+    m += 1;
+    if (m > 12) {
+      m = 1;
+      y += 1;
+    }
+  }
   const last = lastDayOfMonth(y, m);
   const day = Math.min(paymentDay, last);
-  return `${period}-${String(day).padStart(2, '0')}`;
+  return `${y}-${String(m).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 }
 
 /** Generate an array of period strings (YYYY-MM) from start to end inclusive. */
@@ -199,7 +206,7 @@ export async function GET(req: NextRequest) {
 
           const key = `${c.id}:${period}`;
           const payment = paymentIndex.get(key);
-          const dueDate = payment?.dueDate || computeDueDate(period, c.paymentDay);
+          const dueDate = payment?.dueDate || computeDueDate(period, c.paymentDay, c.paymentType);
           const accountInfo = payment?.accountInfo || c.accountInfo;
 
           if (accountInfo) accountSet.add(accountInfo);
@@ -538,12 +545,12 @@ export async function POST(req: NextRequest) {
       // Look up the client (needed for defaults when creating a new payment)
       const [client] = await db.select().from(clients).where(eq(clients.id, clientId));
 
-      let paymentId: number;
+      let paymentId = 0;
 
       if (existing.length === 0) {
         // Create a new payment record with correct defaults
         const dueDate = client
-          ? computeDueDate(period, client.paymentDay)
+          ? computeDueDate(period, client.paymentDay, client.paymentType)
           : `${period}-01`;
 
         const newPayment = await db
@@ -678,7 +685,7 @@ export async function POST(req: NextRequest) {
         nextYear++;
       }
       const toPeriod = `${nextYear}-${String(nextMonth).padStart(2, '0')}`;
-      const nextDueDate = computeDueDate(toPeriod, client.paymentDay);
+      const nextDueDate = computeDueDate(toPeriod, client.paymentDay, client.paymentType);
 
       // Update current period payment status if partially paid
       if (currentPayment) {
