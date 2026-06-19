@@ -73,11 +73,11 @@ async function main() {
             clientId: client.id,
             period: period,
             amount: client.agreedAmount,
+            currency: client.currency || 'TRY',
             status: 'paid',
-            dueDate: dueDate,
             paidDate: dueDate,
-            accountInfo: client.accountInfo || 'IBAN',
-            createdAt: new Date().toISOString()
+            dueDate: dueDate,
+            accountInfo: client.accountInfo || null
         });
         console.log(`Inserted period ${period} as paid.`);
     }
