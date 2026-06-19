@@ -6,7 +6,7 @@ export function proxy(req: NextRequest) {
   const url = req.nextUrl;
 
   // Sadece root ve API rotalarını koruyalım (isteğe bağlı ayarlayabilirsiniz)
-  if (url.pathname === '/' || url.pathname.startsWith('/api')) {
+  if (url.pathname === '/' || url.pathname === '/admin.html' || url.pathname.startsWith('/api')) {
     if (basicAuth) {
       const authValue = basicAuth.split(' ')[1];
       const [user, pwd] = atob(authValue).split(':');
@@ -32,5 +32,5 @@ export function proxy(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/', '/api/:path*'],
+  matcher: ['/', '/admin.html', '/api/:path*'],
 };
