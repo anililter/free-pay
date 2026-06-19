@@ -80,100 +80,100 @@ export async function POST(req: NextRequest) {
   const api = url.searchParams.get('api');
 
   try {
-    if (api === 'client_create') {
-        const body = await req.formData();
-        const insertData: any = {};
-        for (const [key, value] of body.entries()) {
-            insertData[key] = value;
-        }
+    const insertData = await req.json();
 
+    if (api === 'client_create') {
         const newClient = await db.insert(clients).values({
-            name: insertData.client_name,
+            name: insertData.name,
             projectName: insertData.project_name,
             agreedAmount: parseFloat(insertData.agreed_amount || 0),
             currency: insertData.currency || 'TRY',
             paymentDay: parseInt(insertData.payment_day || 1),
             paymentType: insertData.payment_type || 'Aylık',
-            status: insertData.client_status || 'aktif',
-            agreementDate: insertData.start_date || new Date().toISOString().split('T')[0],
+            status: insertData.status || 'aktif',
+            agreementDate: insertData.agreement_date || insertData.start_date || new Date().toISOString().split('T')[0],
             startDate: insertData.start_date || new Date().toISOString().split('T')[0],
-            notes: insertData.client_notes || '',
-            accountInfo: insertData.default_account_info || '',
-            source: insertData.source || 'Direct',
-            referredById: insertData.referred_by_id ? parseInt(insertData.referred_by_id) : null
+            notes: insertData.notes || '',
+            accountInfo: insertData.account_info || '',
+            source: 'Direct',
+            referredById: null
         }).returning();
 
         return NextResponse.json({ success: true, client_id: newClient[0].id });
     }
 
     if (api === 'client_update') {
-        const body = await req.formData();
-        const insertData: any = {};
-        for (const [key, value] of body.entries()) {
-            insertData[key] = value;
-        }
-        
-        const clientId = parseInt(insertData.client_id);
+        const clientId = parseInt(insertData.id);
         await db.update(clients).set({
-            name: insertData.client_name,
+            name: insertData.name,
             projectName: insertData.project_name,
             agreedAmount: parseFloat(insertData.agreed_amount || 0),
             currency: insertData.currency || 'TRY',
             paymentDay: parseInt(insertData.payment_day || 1),
             paymentType: insertData.payment_type || 'Aylık',
-            status: insertData.client_status || 'aktif',
-            agreementDate: insertData.start_date || new Date().toISOString().split('T')[0],
+            status: insertData.status || 'aktif',
+            agreementDate: insertData.agreement_date || insertData.start_date || new Date().toISOString().split('T')[0],
             startDate: insertData.start_date || new Date().toISOString().split('T')[0],
-            notes: insertData.client_notes || '',
-            accountInfo: insertData.default_account_info || '',
-            source: insertData.source || 'Direct',
-            referredById: insertData.referred_by_id ? parseInt(insertData.referred_by_id) : null
+            notes: insertData.notes || '',
+            accountInfo: insertData.account_info || ''
         }).where(eq(clients.id, clientId));
 
         return NextResponse.json({ success: true });
     }
 
     if (api === 'client_delete') {
-        const body = await req.formData();
-        const clientId = parseInt(body.get('client_id') as string);
+        const clientId = parseInt(insertData.id);
         await db.delete(clients).where(eq(clients.id, clientId));
         return NextResponse.json({ success: true });
     }
 
     if (api === 'save_inline') {
-        const body = await req.formData();
-        const clientId = parseInt(body.get('client_id') as string);
-        const amountPaid = body.get('amount_paid') ? parseFloat(body.get('amount_paid') as string) : null;
-        const status = body.get('status') as string;
-        const period = body.get('period') as string;
-        const notes = body.get('notes') as string;
-        const accountInfo = body.get('account_info') as string;
+        const clientId = parseInt(insertData.client_id);
+        const period = insertData.period;
+        const field = insertData.field;
+        let value = insertData.value;
 
         // Check if payment exists for this period
         const existing = await db.select().from(payments)
             .where(and(eq(payments.clientId, clientId), eq(payments.period, period)));
 
-        if (existing.length > 0) {
-            await db.update(payments).set({
-                amount: amountPaid ?? 0,
-                status: status,
-                periodNotes: notes,
-                accountInfo: accountInfo,
-                paidDate: status === 'ödendi' ? new Date().toISOString().split('T')[0] : null
-            }).where(eq(payments.id, existing[0].id));
-        } else {
-            await db.insert(payments).values({
+        let paymentId;
+        if (existing.length === 0) {
+            const newPayment = await db.insert(payments).values({
                 clientId: clientId,
                 period: period,
-                amount: amountPaid ?? 0,
-                status: status,
-                periodNotes: notes,
-                accountInfo: accountInfo,
-                paidDate: status === 'ödendi' ? new Date().toISOString().split('T')[0] : null,
-                currency: 'TRY', // Default or read from client later
+                amount: 0,
+                status: 'pending',
+                currency: 'TRY', 
                 dueDate: new Date().toISOString().split('T')[0]
-            });
+            }).returning();
+            paymentId = newPayment[0].id;
+        } else {
+            paymentId = existing[0].id;
         }
+
+        const updates: any = {};
+        
+        if (field === 'amount_paid') updates.amount = parseFloat(value || 0);
+        else if (field === 'status') {
+            updates.status = value;
+            if (value === 'ödendi') updates.paidDate = new Date().toISOString().split('T')[0];
+            else if (value === 'pending' || value === 'gecikti') updates.paidDate = null;
+        }
+        else if (field === 'notes') updates.periodNotes = value;
+        else if (field === 'account_info') updates.accountInfo = value;
+        else if (field === 'status_with_date') {
+            try {
+                const parsed = JSON.parse(value);
+                updates.status = parsed.status;
+                updates.paidDate = parsed.paid_date;
+            } catch(e) {}
+        }
+
+        if (Object.keys(updates).length > 0) {
+            await db.update(payments).set(updates).where(eq(payments.id, paymentId));
+        }
+
         return NextResponse.json({ success: true });
     }
 
