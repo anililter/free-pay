@@ -160,26 +160,33 @@ export async function GET(req: NextRequest) {
         periodEnd = periodEnd || now;
       }
 
-      const periods = generatePeriodRange(periodStart, periodEnd);
+      // 1. Calculate the target date range for due_date
+      const targetStartDate = `${periodStart}-01`;
+      const [ey, em] = periodEnd.split('-').map(Number);
+      const targetEndDate = `${periodEnd}-${String(lastDayOfMonth(ey, em)).padStart(2, '0')}`;
 
-      // Compute the last calendar date within the range (used for client filtering)
-      const lastPeriod = periods[periods.length - 1];
-      const [ly, lm] = lastPeriod.split('-').map(Number);
-      const lastDateOfRange = `${lastPeriod}-${String(lastDayOfMonth(ly, lm)).padStart(2, '0')}`;
-
-      // Fetch active clients whose start_date <= last date of range
+      // 2. Fetch active clients
       const activeClients = await db
         .select()
         .from(clients)
-        .where(sql`${clients.startDate} <= ${lastDateOfRange}`)
+        .where(sql`${clients.startDate} <= ${targetEndDate}`)
         .orderBy(asc(clients.paymentDay));
 
-      // Fetch all existing payment records for the requested periods
-      const existingPayments = periods.length > 0
+      // 3. To find all virtual rows that might have a due_date in this range,
+      // we check periods from (periodStart - 1 month) to periodEnd.
+      const [sy, sm] = periodStart.split('-').map(Number);
+      const prevMonth = sm === 1 ? 12 : sm - 1;
+      const prevYear = sm === 1 ? sy - 1 : sy;
+      const checkPeriodStart = `${prevYear}-${String(prevMonth).padStart(2, '0')}`;
+      
+      const periodsToCheck = generatePeriodRange(checkPeriodStart, periodEnd);
+
+      // Fetch existing payments in these periods to avoid duplicates and to get actual dueDates
+      const existingPayments = periodsToCheck.length > 0
         ? await db
             .select()
             .from(payments)
-            .where(inArray(payments.period, periods))
+            .where(inArray(payments.period, periodsToCheck))
         : [];
 
       // Index payments by "clientId:period"
@@ -194,21 +201,15 @@ export async function GET(req: NextRequest) {
       // Build response data rows
       const data: Record<string, unknown>[] = [];
       const today = new Date().toISOString().substring(0, 10);
+      const addedKeys = new Set<string>(); // to prevent duplicates if manual due dates shift things wildly
 
-      for (const period of periods) {
-        for (const c of activeClients) {
-          // Skip clients not yet active in this period
-          if (!clientActiveInPeriod(c.startDate, period)) continue;
-          // Skip clients that ended before this period
-          if (clientEndedBeforePeriod(c.endDate, period)) continue;
-          // Skip passive clients
-          if (c.status === 'pasif') continue;
-
-          const key = `${c.id}:${period}`;
-          const payment = paymentIndex.get(key);
-          const dueDate = payment?.dueDate || computeDueDate(period, c.paymentDay, c.paymentType);
-          const accountInfo = payment?.accountInfo || c.accountInfo;
-
+      // Add ALL payments that actually fall in the due_date range (from DB)
+      for (const p of existingPayments) {
+        if (p.dueDate >= targetStartDate && p.dueDate <= targetEndDate) {
+          const c = activeClients.find(client => client.id === p.clientId);
+          if (!c || c.status === 'pasif') continue; // Only active clients
+          
+          const accountInfo = p.accountInfo || c.accountInfo;
           if (accountInfo) accountSet.add(accountInfo);
           if (c.accountInfo) accountSet.add(c.accountInfo);
 
@@ -220,17 +221,60 @@ export async function GET(req: NextRequest) {
             currency: c.currency,
             payment_day: c.paymentDay,
             account_info: accountInfo,
-            payment_id: payment?.id ?? null,
+            payment_id: p.id,
             amount: c.agreedAmount,
-            paid_amount: payment ? payment.amount : null,
-            status: payment?.status ?? 'pending',
-            paid_date: payment?.paidDate ?? null,
-            period_notes: payment?.periodNotes ?? null,
-            due_date: dueDate,
-            period,
+            paid_amount: p.amount,
+            status: p.status,
+            paid_date: p.paidDate ?? null,
+            period_notes: p.periodNotes ?? null,
+            due_date: p.dueDate,
+            period: p.period,
             source: c.source,
             grace_period_days: c.gracePeriodDays,
           });
+          addedKeys.add(`${c.id}:${p.period}`);
+        }
+      }
+
+      // Now add missing (virtual) payments whose COMPUTED due date falls in the range
+      for (const period of periodsToCheck) {
+        for (const c of activeClients) {
+          if (c.status === 'pasif') continue;
+          if (!clientActiveInPeriod(c.startDate, period)) continue;
+          if (clientEndedBeforePeriod(c.endDate, period)) continue;
+
+          const key = `${c.id}:${period}`;
+          if (addedKeys.has(key)) continue; // already added from DB
+
+          const payment = paymentIndex.get(key);
+          const dueDate = payment ? payment.dueDate : computeDueDate(period, c.paymentDay, c.paymentType);
+          
+          if (dueDate >= targetStartDate && dueDate <= targetEndDate) {
+            const accountInfo = payment?.accountInfo || c.accountInfo;
+            if (accountInfo) accountSet.add(accountInfo);
+            if (c.accountInfo) accountSet.add(c.accountInfo);
+
+            data.push({
+              client_id: c.id,
+              client_name: c.name,
+              project_name: c.projectName,
+              agreed_amount: c.agreedAmount,
+              currency: c.currency,
+              payment_day: c.paymentDay,
+              account_info: accountInfo,
+              payment_id: payment?.id ?? null,
+              amount: c.agreedAmount,
+              paid_amount: payment ? payment.amount : null,
+              status: payment?.status ?? 'pending',
+              paid_date: payment?.paidDate ?? null,
+              period_notes: payment?.periodNotes ?? null,
+              due_date: dueDate,
+              period,
+              source: c.source,
+              grace_period_days: c.gracePeriodDays,
+            });
+            addedKeys.add(key);
+          }
         }
       }
 
