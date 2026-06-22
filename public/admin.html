@@ -2900,6 +2900,46 @@
             updateBulkActionBar();
         };
 
+        window.bulkDelete = async function() {
+            if (selectedPayments.size === 0) return;
+            if (!confirm(`Seçili ${selectedPayments.size} adet ödemeyi silmek istediğinize emin misiniz?\nBu işlem geri alınamaz!`)) {
+                return;
+            }
+            
+            const count = selectedPayments.size;
+            
+            const promises = Array.from(selectedPayments).map(key => {
+                const [clientId, period] = key.split('_');
+                return fetch('/api/legacy?api=payment_delete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        client_id: parseInt(clientId, 10),
+                        period
+                    })
+                }).then(res => res.json());
+            });
+            
+            try {
+                showToast(`${count} ödeme siliniyor...`, 'info');
+                const results = await Promise.all(promises);
+                const failures = results.filter(r => !r.success);
+                
+                if (failures.length === 0) {
+                    showToast('Seçilen ödemeler başarıyla silindi.', 'success');
+                } else {
+                    showToast(`${failures.length} ödeme kaydı silinemedi.`, 'danger');
+                }
+                
+                selectedPayments.clear();
+                updateBulkActionBar();
+                loadPaymentsList();
+            } catch (err) {
+                console.error(err);
+                showToast('Bağlantı hatası.', 'danger');
+            }
+        };
+
         window.clearSelection = function() {
             selectedPayments.clear();
             const selectAllCb = document.getElementById('selectAllPayments');
