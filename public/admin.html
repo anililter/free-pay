@@ -2285,7 +2285,7 @@
                     </button>` : '';
 
                 const rowHtml = `
-                    <tr class="${rowClass}" ${isInGroup ? `data-group-id="group_${p.client_id}" style="display: none;"` : ''}>
+                    <tr class="${rowClass}">
                         <td style="text-align: center;">
                             <input type="checkbox" class="payment-row-checkbox" data-client-id="${p.client_id}" data-period="${p.period}" ${isChecked} onchange="onRowCheckboxChange(this, ${p.client_id}, '${p.period}')" style="cursor:pointer; width:15px; height:15px; vertical-align: middle;">
                         </td>
