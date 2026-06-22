@@ -1465,6 +1465,14 @@
             
             <form id="manualPaymentForm" onsubmit="submitManualPayment(event)">
                 <div class="modal-body">
+                    <div style="margin-bottom: 20px; padding: 12px; background: hsl(var(--primary-light), 0.1); border: 1px solid hsl(var(--primary-light), 0.3); border-radius: 8px; text-align: center;">
+                        <span style="font-size: 13px; font-weight: 600; color: hsl(var(--text-primary));">Her ay tekrarlanan bir ödeme mi eklemek istiyorsunuz?</span><br>
+                        <span style="font-size: 12px; color: hsl(var(--text-secondary));">Sistem aktif müşteriler için her ay otomatik beklenti kaydı oluşturur.</span><br>
+                        <button type="button" class="btn" style="margin-top: 10px; padding: 6px 12px; font-size: 12px; background: hsl(var(--primary)); color: white;" onclick="closeManualPaymentModal(); openClientModal()">
+                            <i data-lucide="user-plus" style="width:14px; height:14px; margin-right: 4px;"></i> Yeni Müşteri Ekle
+                        </button>
+                    </div>
+
                     <div class="form-group">
                         <label class="form-label">Müşteri Seçin *</label>
                         <select class="form-control" id="mpClientId" required>
@@ -1732,11 +1740,15 @@
             const now = new Date();
             const year = now.getFullYear();
             const month = String(now.getMonth() + 1).padStart(2, '0');
-            // Default range: previous month start → current month end (shows overdue + current)
+            // Default range: previous month start → current month + 6 months
             const prevMonth = now.getMonth() === 0 ? 12 : now.getMonth();
             const prevYear = now.getMonth() === 0 ? year - 1 : year;
             const startPeriod = `${prevYear}-${String(prevMonth).padStart(2, '0')}`;
-            const endPeriod = `${year}-${month}`;
+            
+            const futureDate = new Date(year, now.getMonth() + 6, 1);
+            const futureYear = futureDate.getFullYear();
+            const futureMonth = String(futureDate.getMonth() + 1).padStart(2, '0');
+            const endPeriod = `${futureYear}-${futureMonth}`;
             
             document.getElementById('filterPeriodStart').value = startPeriod;
             document.getElementById('filterPeriodEnd').value = endPeriod;
@@ -2202,18 +2214,16 @@
                 return matchesSearch && matchesAccount && matchesStatus;
             });
 
-            // Sort: overdue first (oldest overdue at top), then upcoming by nearest due date
+            // Sort: purely chronological (yakından uzağa) based on due date
             filtered.sort((a, b) => {
-                const aIsOverdue = (a.status !== 'paid') && a.due_date < todayStr;
-                const bIsOverdue = (b.status !== 'paid') && b.due_date < todayStr;
                 const aIsPaid = a.status === 'paid';
                 const bIsPaid = b.status === 'paid';
-                // Overdue first, then upcoming, then paid last
-                if (aIsOverdue && !bIsOverdue) return -1;
-                if (!aIsOverdue && bIsOverdue) return 1;
+                
+                // Ödenenler hep en altta
                 if (aIsPaid && !bIsPaid) return 1;
                 if (!aIsPaid && bIsPaid) return -1;
-                // Within same group, sort by due_date
+                
+                // Kalan her şeyi tarih sırasına göre yakından uzağa
                 const dateCompare = a.due_date.localeCompare(b.due_date);
                 if (dateCompare !== 0) return dateCompare;
                 return a.client_name.localeCompare(b.client_name);
@@ -2238,60 +2248,15 @@
                 }
             }
 
-            // Grup oluştur: SADECE önceki dönemlerdeki gecikmeleri grupla
-            // Seçili ay (selectedPeriod) geçmiş olsa bile "bu ayın ödemesi" sayılır, gecikme grubuna dahil edilmez.
-            // Örn: Nisan gecikmiş + Mayıs (seçili ay) bekleniyor → gruplama: sadece Nisan sayılır → 1 ay gecikme
-            const clientGroups = {};
-            filtered.forEach(p => {
-                const isItemPaid = p.status === 'paid';
-                // Yalnızca seçili aydan önceki dönemler gecikme grubuna girer
-                const isPastPeriod = p.period < selectedPeriod;
-                if (!isItemPaid && isPastPeriod) {
-                    if (!clientGroups[p.client_id]) clientGroups[p.client_id] = [];
-                    clientGroups[p.client_id].push(p);
-                }
-            });
-
             filtered.forEach(p => {
                 const isOverdue = (p.status === 'pending' || p.status === 'partial') && p.due_date < todayStr;
                 const isPaid = p.status === 'paid';
                 const isPartial = p.status === 'partial';
 
-                // Grup başlığı: bu müşterinin ilk satırıysa ve 2+ ödenmemiş ay varsa
-                const group = clientGroups[p.client_id];
-                const isFirstInGroup = group && group.length >= 2 && group[0] === p;
-                if (isFirstInGroup) {
-                    const totalMonths = group.length;
-                    const totalRemaining = group.reduce((sum, item) => {
-                        const rem = item.status === 'partial' && item.paid_amount != null
-                            ? item.amount - item.paid_amount
-                            : item.amount;
-                        return sum + rem;
-                    }, 0);
-                    const groupId = `group_${p.client_id}`;
-                    tbody.insertAdjacentHTML('beforeend', `
-                        <tr class="row-group-header collapsed" id="${groupId}" onclick="toggleGroup('${groupId}')">
-                            <td colspan="6" style="padding: 8px 16px;">
-                                <div style="display:flex; align-items:center; gap:10px;">
-                                    <i data-lucide="chevron-right" style="width:14px;height:14px;color:#f87171;" id="${groupId}_icon"></i>
-                                    <span style="font-weight:800; color:#f87171; font-size:13px;">${escapeHtml(p.client_name)}</span>
-                                    <span style="font-size:11px; color:hsl(var(--text-secondary));">&#8212;</span>
-                                    <span style="font-size:12px; color:hsl(var(--text-secondary));"><b>${totalMonths} ay</b> gecikme</span>
-                                    <span style="margin-left:auto; font-weight:800; color:#f87171; font-size:13px;">
-                                        Toplam: ${formatCurrency(totalRemaining, p.currency)}
-                                    </span>
-                                </div>
-                            </td>
-                        </tr>
-                    `);
-                }
-
-                const isInGroup = group && group.length >= 2;
-
-                let rowClass = isInGroup ? 'row-overdue group-member' : 'row-upcoming';
+                let rowClass = 'row-upcoming';
                 if (isPaid) rowClass = 'row-paid';
-                else if (isPartial) rowClass = isInGroup ? 'row-overdue group-member' : 'row-overdue';
-                else if (isOverdue) rowClass = isInGroup ? 'row-overdue group-member' : 'row-overdue';
+                else if (isPartial) rowClass = 'row-overdue';
+                else if (isOverdue) rowClass = 'row-overdue';
 
                 const relativeDateBadge = getRelativeDateStr(isPaid ? p.paid_date : p.due_date, p.status, p.grace_period_days);
                 let badgeClass = isPaid ? 'paid' : isPartial ? 'partial' : (isOverdue ? 'overdue' : 'upcoming');
