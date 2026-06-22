@@ -842,6 +842,24 @@
         .btn-bulk-pending:hover {
             opacity: 0.9;
         }
+        .btn-bulk-delete {
+            background: rgba(248, 113, 113, 0.15);
+            color: #f87171;
+            border: 1px solid rgba(248, 113, 113, 0.3);
+            padding: 5px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.15s ease;
+        }
+        .btn-bulk-delete:hover {
+            background: rgba(248, 113, 113, 0.25);
+            border-color: rgba(248, 113, 113, 0.5);
+        }
         .btn-bulk-clear {
             background: transparent;
             color: #94a3b8;
@@ -1611,6 +1629,9 @@
                 </button>
                 <button class="btn-bulk-pending" onclick="bulkMarkAsPending()">
                     <i data-lucide="clock" style="width:14px; height:14px;"></i> Bekliyor Yap
+                </button>
+                <button class="btn-bulk-delete" onclick="bulkDelete()">
+                    <i data-lucide="trash-2" style="width:14px; height:14px;"></i> Sil
                 </button>
                 <button class="btn-bulk-clear" onclick="clearSelection()">
                     Seçimi Temizle

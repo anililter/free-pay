@@ -568,6 +568,18 @@ export async function POST(req: NextRequest) {
     }
 
     // -----------------------------------------------------------------------
+    // payment_delete
+    // -----------------------------------------------------------------------
+    if (api === 'payment_delete') {
+      const clientId = parseInt(body.client_id, 10);
+      const period: string = body.period;
+      if (!clientId || !period) return fail('Missing client id or period');
+
+      await db.delete(payments).where(and(eq(payments.clientId, clientId), eq(payments.period, period)));
+      return ok({ message: 'Payment deleted' });
+    }
+
+    // -----------------------------------------------------------------------
     // save_inline
     // -----------------------------------------------------------------------
     if (api === 'save_inline') {
