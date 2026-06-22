@@ -24,6 +24,7 @@ export const payments = sqliteTable('payments', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   clientId: integer('client_id').notNull().references(() => clients.id, { onDelete: 'cascade' }),
   period: text('period').notNull(),
+  expectedAmount: real('expected_amount'),
   amount: real('amount').notNull(),
   currency: text('currency').notNull(),
   status: text('status').notNull().default('pending'),

@@ -936,6 +936,9 @@
             <!-- Filters Toolbar -->
             <div class="toolbar">
                 <div class="filter-group">
+                    <button class="btn btn-primary" onclick="openManualPaymentModal()" style="display:flex; align-items:center; gap:6px;">
+                        <i data-lucide="plus" style="width:16px; height:16px;"></i> Yeni Ödeme
+                    </button>
                     <div class="search-wrapper">
                         <i data-lucide="search"></i>
                         <input type="text" id="searchClient" class="form-control search-control" placeholder="Müşteri veya not ara...">
@@ -1429,6 +1432,70 @@
                     <button type="submit" class="btn btn-primary" id="pmSaveBtn">
                         <i data-lucide="check-circle-2" style="width:16px;height:16px;"></i> Kaydet
                     </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: Manuel Ödeme Ekle -->
+    <div class="modal-backdrop" id="manualPaymentModal">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 class="modal-title">Manuel Ödeme Ekle</h3>
+                <button class="modal-close" onclick="closeManualPaymentModal()"><i data-lucide="x" style="width:16px;height:16px;"></i></button>
+            </div>
+            
+            <form id="manualPaymentForm" onsubmit="submitManualPayment(event)">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label class="form-label">Müşteri Seçin *</label>
+                        <select class="form-control" id="mpClientId" required>
+                            <!-- JS ile doldurulacak -->
+                        </select>
+                    </div>
+
+                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px;">
+                        <div class="form-group">
+                            <label class="form-label">Dönem (YYYY-MM) *</label>
+                            <input type="month" class="form-control" id="mpPeriod" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Vade Tarihi *</label>
+                            <input type="date" class="form-control" id="mpDueDate" required>
+                        </div>
+                    </div>
+
+                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px;">
+                        <div class="form-group">
+                            <label class="form-label">Beklenen Tutar *</label>
+                            <div class="input-icon-wrapper">
+                                <span class="input-icon" id="mpCurrencyLabel" style="font-weight:bold; color:hsl(var(--text-secondary));">₺</span>
+                                <input type="number" step="0.01" class="form-control" id="mpExpectedAmount" required style="padding-left:36px;">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Durum</label>
+                            <select class="form-control" id="mpStatus">
+                                <option value="pending">Bekliyor (Ödenmedi)</option>
+                                <option value="paid">Ödendi</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group" id="mpPaidDateGroup" style="display:none;">
+                        <label class="form-label">Ödenme Tarihi</label>
+                        <input type="date" class="form-control" id="mpPaidDate">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Notlar</label>
+                        <input type="text" class="form-control" id="mpNotes" placeholder="Opsiyonel">
+                    </div>
+                </div>
+
+                <div class="modal-footer" style="margin-top: 24px; padding-top: 16px; border-top: 1px solid hsl(var(--border)); display: flex; justify-content: flex-end; gap: 12px;">
+                    <button type="button" class="btn btn-secondary" onclick="closeManualPaymentModal()">Vazgeç</button>
+                    <button type="submit" class="btn btn-primary">Ödemeyi Ekle</button>
                 </div>
             </form>
         </div>
@@ -2009,13 +2076,16 @@
         // Relative Date badge calculation
         function getRelativeDateStr(dateStr, status, graceDays) {
             if (!dateStr) return '';
+            
+            // Parse date specifically as local to avoid UTC offset issues
+            const parts = dateStr.split('T')[0].split('-');
+            const target = new Date(parts[0], parts[1] - 1, parts[2]);
+            target.setHours(0,0,0,0);
+            
             const today = new Date();
             today.setHours(0,0,0,0);
-            
-            const target = new Date(dateStr);
-            target.setHours(0,0,0,0);
 
-            const diffTime = target - today;
+            const diffTime = target.getTime() - today.getTime();
             const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
 
             const formattedDate = `${target.getDate()} ${MONTHS_SHORT[target.getMonth()]}`;
@@ -2031,15 +2101,15 @@
                 if (absDays <= effectiveGrace) {
                     return `${absDays} gün (toleransta)`;
                 }
-                const realDelay = absDays - effectiveGrace;
-                if (realDelay >= 7 && realDelay < 30) {
-                    const weeks = Math.floor(realDelay / 7);
-                    return `${weeks} hafta gecikti`;
-                } else if (realDelay >= 30) {
-                    const monthsDiff = Math.floor(realDelay / 30);
+                
+                if (absDays >= 30) {
+                    const monthsDiff = Math.floor(absDays / 30);
                     return `${monthsDiff} ay gecikti`;
+                } else if (absDays >= 7) {
+                    const weeks = Math.floor(absDays / 7);
+                    return `${weeks} hafta gecikti`;
                 }
-                return `${realDelay} gün gecikti`;
+                return `${absDays} gün gecikti`;
             } else if (diffDays === 0) {
                 return 'Bugün';
             } else if (diffDays === 1) {
@@ -2274,7 +2344,13 @@
                             </div>
                         </td>
                         <td>
-                            <div style="font-weight: 700; color:hsl(var(--text-secondary));">${formatCurrency(p.agreed_amount, p.currency)}</div>
+                            <div style="display:flex; align-items:center;">
+                                <input type="number" class="table-input" value="${p.amount}" 
+                                       title="Beklenen Tutarı Değiştir"
+                                       style="font-size: 13px; font-weight: 700; width: 80px; color:hsl(var(--text-secondary)); border: 1px dashed transparent; text-align:right;"
+                                       onchange="onInlineEdit(${p.client_id}, '${p.period}', 'expected_amount', this)">
+                                <span style="font-size:12px; margin-left:4px; font-weight:700; color:hsl(var(--text-secondary));">${p.currency === 'TRY' ? '₺' : '$'}</span>
+                            </div>
                             ${partialDisplay}
                         </td>
                         <td>
@@ -2298,6 +2374,8 @@
             if (p) {
                 if (field === 'amount') {
                     p.amount = parseFloat(value) || 0;
+                } else if (field === 'expected_amount') {
+                    p.amount = parseFloat(value) || 0;
                 } else if (field === 'paid_amount') {
                     p.paid_amount = parseFloat(value) || null;
                 } else if (field === 'period_notes') {
@@ -2313,7 +2391,7 @@
             
             renderStats();
             
-            if (field === 'paid_date' || field === 'amount' || field === 'paid_amount' || field === 'due_date') {
+            if (field === 'paid_date' || field === 'amount' || field === 'expected_amount' || field === 'paid_amount' || field === 'due_date') {
                 saveInline(clientId, period, field, value);
             } else {
                 saveInlineNoRender(clientId, period, field, value, inputElement);
@@ -3142,6 +3220,112 @@
                 tbody.insertAdjacentHTML('beforeend', rowHtml);
             });
             lucide.createIcons();
+        };
+
+        window.openManualPaymentModal = function() {
+            const form = document.getElementById('manualPaymentForm');
+            form.reset();
+            
+            const select = document.getElementById('mpClientId');
+            select.innerHTML = '<option value="">-- Müşteri Seçin --</option>';
+            window.allClients.forEach(c => {
+                const opt = document.createElement('option');
+                opt.value = c.id;
+                opt.textContent = `${c.name} (${c.project_name})`;
+                select.appendChild(opt);
+            });
+            
+            const now = new Date();
+            const y = now.getFullYear();
+            const m = String(now.getMonth() + 1).padStart(2, '0');
+            document.getElementById('mpPeriod').value = `${y}-${m}`;
+            
+            document.getElementById('manualPaymentModal').classList.add('show');
+            
+            // Handle status change for PaidDate visibility
+            document.getElementById('mpStatus').addEventListener('change', function() {
+                document.getElementById('mpPaidDateGroup').style.display = this.value === 'paid' ? 'block' : 'none';
+            });
+            
+            // Handle client change to populate currency and expected amount
+            select.addEventListener('change', function() {
+                const clientId = parseInt(this.value);
+                const client = window.allClients.find(c => c.id === clientId);
+                if (client) {
+                    document.getElementById('mpCurrencyLabel').textContent = client.currency === 'TRY' ? '₺' : '$';
+                    document.getElementById('mpExpectedAmount').value = client.agreed_amount;
+                } else {
+                    document.getElementById('mpCurrencyLabel').textContent = '₺';
+                    document.getElementById('mpExpectedAmount').value = '';
+                }
+            });
+        };
+
+        window.closeManualPaymentModal = function() {
+            document.getElementById('manualPaymentModal').classList.remove('show');
+        };
+
+        window.submitManualPayment = async function(e) {
+            e.preventDefault();
+            const clientId = document.getElementById('mpClientId').value;
+            const period = document.getElementById('mpPeriod').value;
+            const expectedAmount = document.getElementById('mpExpectedAmount').value;
+            const dueDate = document.getElementById('mpDueDate').value;
+            const status = document.getElementById('mpStatus').value;
+            const paidDate = document.getElementById('mpPaidDate').value;
+            const notes = document.getElementById('mpNotes').value;
+            
+            try {
+                // First initialize/create the inline payment
+                const res = await fetch('/api/legacy?api=save_inline', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        client_id: clientId,
+                        period: period,
+                        field: 'expected_amount',
+                        value: expectedAmount
+                    })
+                });
+                const result = await res.json();
+                if (!result.success) throw new Error(result.error);
+                
+                // Set due date
+                await fetch('/api/legacy?api=save_inline', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ client_id: clientId, period, field: 'due_date', value: dueDate })
+                });
+                
+                // Set notes
+                if (notes) {
+                    await fetch('/api/legacy?api=save_inline', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ client_id: clientId, period, field: 'period_notes', value: notes })
+                    });
+                }
+                
+                // Set status / paid date
+                if (status === 'paid') {
+                    await fetch('/api/legacy?api=save_inline', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            client_id: clientId, period, field: 'status_with_date',
+                            value: JSON.stringify({ status: 'paid', paid_date: paidDate })
+                        })
+                    });
+                }
+                
+                showToast('Manuel ödeme eklendi', 'success');
+                closeManualPaymentModal();
+                loadPaymentsList();
+                
+            } catch (error) {
+                console.error(error);
+                showToast('Hata: ' + error.message, 'danger');
+            }
         };
 
         window.openClientModal = function(id = null) {

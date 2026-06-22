@@ -222,7 +222,7 @@ export async function GET(req: NextRequest) {
             payment_day: c.paymentDay,
             account_info: accountInfo,
             payment_id: p.id,
-            amount: c.agreedAmount,
+            amount: p.expectedAmount ?? c.agreedAmount,
             paid_amount: p.amount,
             status: p.status,
             paid_date: p.paidDate ?? null,
@@ -263,7 +263,7 @@ export async function GET(req: NextRequest) {
               payment_day: c.paymentDay,
               account_info: accountInfo,
               payment_id: payment?.id ?? null,
-              amount: c.agreedAmount,
+              amount: payment?.expectedAmount ?? c.agreedAmount,
               paid_amount: payment ? payment.amount : null,
               status: payment?.status ?? 'pending',
               paid_date: payment?.paidDate ?? null,
@@ -619,14 +619,28 @@ export async function POST(req: NextRequest) {
       const updates: Record<string, unknown> = {};
 
       switch (field) {
+        case 'expected_amount': {
+          const expectedAmount = parseFloat(value) || 0;
+          updates.expectedAmount = expectedAmount;
+          const currentAmount = existing.length > 0 ? existing[0].amount : 0;
+          if (currentAmount > 0 && currentAmount < expectedAmount) {
+             updates.status = 'partial';
+          } else if (currentAmount >= expectedAmount && expectedAmount > 0) {
+             updates.status = 'paid';
+          } else {
+             updates.status = 'pending';
+          }
+          break;
+        }
         case 'amount':
         case 'paid_amount': {
           const paidAmount = parseFloat(value) || 0;
           updates.amount = paidAmount;
           // Auto-detect status
+          const expected = existing.length > 0 && existing[0].expectedAmount != null ? existing[0].expectedAmount : (client?.agreedAmount || 0);
           if (paidAmount <= 0) {
             updates.status = 'pending';
-          } else if (client && paidAmount < client.agreedAmount) {
+          } else if (paidAmount < expected) {
             updates.status = 'partial';
           } else {
             updates.status = 'paid';
@@ -725,7 +739,7 @@ export async function POST(req: NextRequest) {
         .from(payments)
         .where(and(eq(payments.clientId, clientId), eq(payments.period, period)));
 
-      const agreedAmount = client.agreedAmount;
+      const agreedAmount = currentPayment?.expectedAmount ?? client.agreedAmount;
       const paidAmount = currentPayment?.amount ?? 0;
       const remaining = agreedAmount - paidAmount;
 
@@ -757,17 +771,18 @@ export async function POST(req: NextRequest) {
         .where(and(eq(payments.clientId, clientId), eq(payments.period, toPeriod)));
 
       if (existingNext) {
-        // Add remaining to existing next period payment
+        const nextExpected = existingNext.expectedAmount ?? client.agreedAmount;
         await db
           .update(payments)
-          .set({ amount: existingNext.amount + remaining })
+          .set({ expectedAmount: nextExpected + remaining })
           .where(eq(payments.id, existingNext.id));
       } else {
         // Create a new payment record for next period with remaining amount
         await db.insert(payments).values({
           clientId,
           period: toPeriod,
-          amount: remaining,
+          expectedAmount: remaining,
+          amount: 0,
           currency: client.currency,
           status: 'pending',
           dueDate: nextDueDate,
