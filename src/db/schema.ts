@@ -49,5 +49,6 @@ export const vaultTransactions = sqliteTable('vault_transactions', {
   description: text('description'),
   clientName: text('client_name'),
   paymentId: integer('payment_id'), // optional link to a specific payment
+  attachmentUrl: text('attachment_url'), // optional base64 or link to invoice image
   createdAt: text('created_at').notNull().$defaultFn(() => new Date().toISOString()),
 });

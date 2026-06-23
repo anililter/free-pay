@@ -936,6 +936,11 @@
                 <div class="stat-card paid">
                     <span class="stat-label">Tahsil Edilen (Ödenen)</span>
                     <span class="stat-value" id="statTotalPaid" style="color:#4ade80;">0 ₺</span>
+                    <div id="statPaidBreakdown" style="font-size: 11px; color: hsl(var(--text-muted)); margin-top: 2px; display: flex; gap: 8px; flex-wrap: wrap;">
+                        <span>Bu Ayın: <strong id="paidThisMonthVal">0 ₺</strong></span>
+                        <span style="color: hsl(var(--border-color));">|</span>
+                        <span>Geçmişten Gelen: <strong id="paidLateVal">0 ₺</strong></span>
+                    </div>
                 </div>
                 <div class="stat-card overdue">
                     <span class="stat-label">Geciken Alacaklar</span>
@@ -1137,8 +1142,14 @@
 
         <div id="tabViewKasa" class="tab-content">
             <div class="panel">
-                <div class="panel-header" style="justify-content: space-between;">
-                    <h2>Kasa & Hesap Bakiyeleri</h2>
+                <div class="panel-header" style="justify-content: space-between; align-items: flex-end;">
+                    <div>
+                        <h2>Kasa & Hesap Bakiyeleri</h2>
+                        <div style="margin-top: 8px;">
+                            <span style="font-size: 14px; color: hsl(var(--text-secondary));">Toplam Nakit Varlık: </span>
+                            <span id="vaultGrandTotal" style="font-size: 24px; font-weight: 800; color: hsl(var(--primary));">0 ₺</span>
+                        </div>
+                    </div>
                     <button class="btn btn-primary" onclick="openKasaTransactionModal('', 'income')">+ Yeni İşlem / Hesap Ekle</button>
                 </div>
                 <!-- Kasa Accounts Grid -->
@@ -1148,19 +1159,20 @@
             </div>
 
             <div class="panel" style="margin-top: 24px;">
-                <div class="panel-header">
+                <div class="panel-header" style="justify-content: space-between;">
                     <h2>Hesap İşlem Geçmişi (Ledger)</h2>
+                    <button id="btnResetVaultFilter" class="btn btn-outline" style="display: none; padding: 6px 12px; font-size: 13px;" onclick="resetVaultFilter()">Tüm İşlemleri Göster</button>
                 </div>
                 <div class="table-container">
                     <table>
                         <thead>
                             <tr>
-                                <th>Tarih</th>
-                                <th>Hesap</th>
-                                <th>İşlem Tipi</th>
-                                <th>Açıklama / Müşteri</th>
-                                <th style="text-align: right;">Tutar</th>
-                                <th style="width: 70px;"></th>
+                                <th style="text-align: center;">Tarih</th>
+                                <th style="text-align: center;">Hesap</th>
+                                <th style="text-align: center;">İşlem Tipi</th>
+                                <th style="text-align: center;">Açıklama / Müşteri</th>
+                                <th style="text-align: center;">Tutar</th>
+                                <th style="width: 100px; text-align: center;">İşlem</th>
                             </tr>
                         </thead>
                         <tbody id="kasaHistoryTableBody">
@@ -1468,12 +1480,27 @@
                         <label class="form-label">Açıklama / Not</label>
                         <textarea id="ktNotes" class="form-input" rows="2" placeholder="Nereden geldi, nereye gitti?"></textarea>
                     </div>
+                    <div class="form-group">
+                        <label class="form-label">Fatura / Görsel Yükle (Opsiyonel)</label>
+                        <input type="file" id="ktImage" class="form-input" accept="image/*" onchange="handleVaultImageSelect(event)">
+                        <input type="hidden" id="ktImageBase64">
+                    </div>
                 </form>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn" style="background: hsl(var(--bg-base)); color: hsl(var(--text-primary)); border: 1px solid hsl(var(--border-color));" onclick="closeKasaTransactionModal()">İptal</button>
                 <button type="submit" form="ktForm" class="btn btn-primary" id="ktSaveBtn">Kaydet</button>
             </div>
+        </div>
+    </div>
+
+    <!-- Image View Modal -->
+    <div class="modal-backdrop" id="imageViewModal">
+        <div class="modal-card" style="max-width: 800px; padding: 0; background: transparent; box-shadow: none;">
+            <div style="text-align: right; margin-bottom: 8px;">
+                <button class="modal-close" style="color: white; background: rgba(0,0,0,0.5); border-radius: 50%; padding: 8px;" onclick="closeInvoiceImage()"><i data-lucide="x" style="width:24px;height:24px;"></i></button>
+            </div>
+            <img id="imageViewPreview" src="" style="width: 100%; max-height: 80vh; object-fit: contain; border-radius: 8px; background: white;" alt="Fatura Görseli">
         </div>
     </div>
 
@@ -3674,18 +3701,41 @@
                 const res = await fetch('/api/legacy?api=vault_stats');
                 const result = await res.json();
                 if (result.success) {
+                    window.vaultHistoryData = result.data.history || [];
                     renderKasaGrid(result.data.accounts || []);
-                    renderKasaHistory(result.data.history || []);
+                    renderKasaHistory(window.vaultHistoryData);
                 }
             } catch(e) {
                 console.error(e);
             }
         };
 
+        window.filterVaultHistory = function(accountName) {
+            if (!window.vaultHistoryData) return;
+            const filtered = window.vaultHistoryData.filter(t => t.accountName === accountName);
+            renderKasaHistory(filtered);
+            document.getElementById('btnResetVaultFilter').style.display = 'inline-block';
+        };
+
+        window.resetVaultFilter = function() {
+            if (!window.vaultHistoryData) return;
+            renderKasaHistory(window.vaultHistoryData);
+            document.getElementById('btnResetVaultFilter').style.display = 'none';
+        };
+
         function renderKasaGrid(accounts) {
             const grid = document.getElementById('kasaGrid');
             grid.innerHTML = '';
             
+            // Calculate Total Balance
+            let grandTotalTry = 0;
+            accounts.forEach(acc => {
+                if (acc.currency === 'TRY' || !acc.currency) {
+                    grandTotalTry += acc.balance;
+                }
+            });
+            document.getElementById('vaultGrandTotal').textContent = formatCurrency(grandTotalTry, 'TRY');
+
             if (accounts.length === 0) {
                 grid.innerHTML = '<div style="padding: 40px; text-align: center; background: #f9f9f9; border-radius: 12px; border: 2px dashed #ddd; color: #888;">Henüz tanımlı kasa hesabı bulunmuyor. Yeni bir işlem ekleyerek başlayın.</div>';
                 return;
@@ -3718,10 +3768,11 @@
                                 <span style="font-size: 11px; color: hsl(var(--text-muted)); font-weight: 600;">MEVCUT BAKİYE</span>
                                 <span style="font-size: 20px; font-weight: 900; color: hsl(var(--text-primary));">${formatCurrency(acc.balance, acc.currency)}</span>
                             </div>
-                            <div style="display: flex; gap: 8px;">
-                                <button class="btn" style="padding: 6px 12px; font-size: 12px; background: hsl(var(--bg-card)); color: hsl(var(--text-primary)); border: 1px solid hsl(var(--border-color));" onclick="adjustKasaBalance('${escapeHtml(acc.name)}', ${acc.balance})">Bakiye Eşitle</button>
-                                <button class="btn" style="padding: 6px 12px; font-size: 12px; background: hsl(var(--success)); color: white;" onclick="openKasaTransactionModal('${escapeHtml(acc.name)}', 'income')">+ Giriş</button>
-                                <button class="btn btn-primary" style="padding: 6px 12px; font-size: 12px;" onclick="openKasaTransactionModal('${escapeHtml(acc.name)}', 'expense')">- Çıkış</button>
+                            <div style="display: flex; gap: 4px;">
+                                <button class="btn" style="padding: 6px 10px; font-size: 12px; background: hsl(var(--bg-card)); color: hsl(var(--text-primary)); border: 1px solid hsl(var(--border-color));" onclick="filterVaultHistory('${escapeHtml(acc.name)}')">Geçmiş</button>
+                                <button class="btn" style="padding: 6px 10px; font-size: 12px; background: hsl(var(--bg-card)); color: hsl(var(--text-primary)); border: 1px solid hsl(var(--border-color));" onclick="adjustKasaBalance('${escapeHtml(acc.name)}', ${acc.balance})">Eşitle</button>
+                                <button class="btn" style="padding: 6px 10px; font-size: 12px; background: hsl(var(--success)); color: white;" onclick="openKasaTransactionModal('${escapeHtml(acc.name)}', 'income')">+ Giriş</button>
+                                <button class="btn btn-primary" style="padding: 6px 10px; font-size: 12px;" onclick="openKasaTransactionModal('${escapeHtml(acc.name)}', 'expense')">- Çıkış</button>
                             </div>
                         </div>
                     </div>
@@ -3751,18 +3802,19 @@
                 
                 const html = `
                     <tr>
-                        <td style="padding: 12px 18px; font-weight: 600; color: hsl(var(--text-primary));">${d}.${m}.${y}</td>
-                        <td style="padding: 12px 18px;">
+                        <td style="padding: 12px 18px; font-weight: 600; color: hsl(var(--text-primary)); text-align: center;">${d}.${m}.${y}</td>
+                        <td style="padding: 12px 18px; text-align: center;">
                             <span style="background: hsla(var(--primary-rgb), 0.1); color: hsl(var(--primary)); padding: 4px 8px; border-radius: 6px; font-size: 12px; font-weight: 700;">
                                 ${escapeHtml(item.accountName)}
                             </span>
                         </td>
-                        <td style="padding: 12px 18px; font-size: 12px; font-weight: 600; color: ${color};">${typeLabel}</td>
-                        <td style="padding: 12px 18px; color: hsl(var(--text-secondary)); font-size: 13px;">${escapeHtml(item.description || item.clientName || '-')}</td>
-                        <td style="padding: 12px 18px; text-align: right; font-weight: 800; color: ${color};">
+                        <td style="padding: 12px 18px; font-size: 12px; font-weight: 600; color: ${color}; text-align: center;">${typeLabel}</td>
+                        <td style="padding: 12px 18px; color: hsl(var(--text-secondary)); font-size: 13px; text-align: center;">${escapeHtml(item.description || item.clientName || '-')}</td>
+                        <td style="padding: 12px 18px; text-align: center; font-weight: 800; color: ${color};">
                             ${sign}${formatCurrency(item.amount, item.currency)}
                         </td>
-                        <td style="padding: 12px 18px; text-align: right;">
+                        <td style="padding: 12px 18px; text-align: center;">
+                            ${item.attachmentUrl ? `<button class="icon-btn" style="color: hsl(var(--primary)); margin-right: 4px;" onclick="viewInvoiceImage('${item.attachmentUrl}')" title="Faturayı Gör"><i data-lucide="image" style="width:16px;height:16px;"></i></button>` : ''}
                             <button class="icon-btn" style="color: hsl(var(--primary)); opacity: 0.7; margin-right: 4px;" onclick="editKasaTransaction('${itemData}')" title="Düzenle">
                                 <i data-lucide="edit-2" style="width:16px;height:16px;"></i>
                             </button>
@@ -3784,6 +3836,8 @@
             document.getElementById('ktAmount').value = '';
             document.getElementById('ktDate').value = new Date().toISOString().split('T')[0];
             document.getElementById('ktNotes').value = '';
+            document.getElementById('ktImage').value = ''; // Reset file input
+            document.getElementById('ktImageBase64').value = ''; // Reset base64
             document.getElementById('ktType').disabled = false;
             document.getElementById('ktAccountName').disabled = (accountName !== '');
 
@@ -3840,8 +3894,56 @@
                 amount: document.getElementById('ktAmount').value,
                 date: document.getElementById('ktDate').value,
                 description: document.getElementById('ktNotes').value,
-                client_name: document.getElementById('ktClientName').value
+                client_name: document.getElementById('ktClientName').value,
+                attachment_url: document.getElementById('ktImageBase64').value || undefined
             };
+
+        window.handleVaultImageSelect = function(e) {
+            const file = e.target.files[0];
+            if (!file) {
+                document.getElementById('ktImageBase64').value = '';
+                return;
+            }
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                const img = new Image();
+                img.onload = function() {
+                    const canvas = document.createElement('canvas');
+                    let width = img.width;
+                    let height = img.height;
+                    const max_size = 1200;
+                    if (width > height) {
+                        if (width > max_size) {
+                            height *= max_size / width;
+                            width = max_size;
+                        }
+                    } else {
+                        if (height > max_size) {
+                            width *= max_size / height;
+                            height = max_size;
+                        }
+                    }
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+                    const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+                    document.getElementById('ktImageBase64').value = dataUrl;
+                }
+                img.src = event.target.result;
+            }
+            reader.readAsDataURL(file);
+        };
+
+        window.viewInvoiceImage = function(url) {
+            document.getElementById('imageViewPreview').src = url;
+            document.getElementById('imageViewModal').classList.add('active');
+        };
+
+        window.closeInvoiceImage = function() {
+            document.getElementById('imageViewModal').classList.remove('active');
+            document.getElementById('imageViewPreview').src = '';
+        };
             
             if (id) payload.id = id;
 

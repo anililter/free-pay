@@ -657,6 +657,54 @@ export async function POST(req: NextRequest) {
     }
 
     // -----------------------------------------------------------------------
+    // vault_transaction_create
+    // -----------------------------------------------------------------------
+    if (api === 'vault_transaction_create') {
+      const { account_name, type, amount, currency, date, description, client_name, payment_id, attachment_url } = body;
+      if (!account_name || !type || amount === undefined || !date) {
+        return fail('Missing required fields for vault transaction');
+      }
+
+      await db.insert(vaultTransactions).values({
+        accountName: account_name,
+        type,
+        amount: parseFloat(amount),
+        currency: currency || 'TRY',
+        date,
+        description,
+        clientName: client_name,
+        paymentId: payment_id ? parseInt(payment_id, 10) : null,
+        attachmentUrl: attachment_url || null,
+      });
+
+      return ok({ message: 'Transaction created' });
+    }
+
+    // -----------------------------------------------------------------------
+    // vault_transaction_update
+    // -----------------------------------------------------------------------
+    if (api === 'vault_transaction_update') {
+      const { id, account_name, type, amount, currency, date, description, client_name, payment_id, attachment_url } = body;
+      if (!id || !account_name || !type || amount === undefined || !date) {
+        return fail('Missing required fields');
+      }
+
+      await db.update(vaultTransactions).set({
+        accountName: account_name,
+        type,
+        amount: parseFloat(amount),
+        currency: currency || 'TRY',
+        date,
+        description,
+        clientName: client_name,
+        paymentId: payment_id ? parseInt(payment_id, 10) : null,
+        attachmentUrl: attachment_url || null,
+      }).where(eq(vaultTransactions.id, parseInt(id, 10)));
+
+      return ok({ message: 'Transaction updated' });
+    }
+
+    // -----------------------------------------------------------------------
     // client_delete
     // -----------------------------------------------------------------------
     if (api === 'client_delete') {
