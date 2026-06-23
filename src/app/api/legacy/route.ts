@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
-import { clients, payments, settings } from '@/db/schema';
+import { clients, payments, settings, withdrawals } from '@/db/schema';
 import { eq, and, sql, asc, desc, gte, lte, inArray } from 'drizzle-orm';
 
 // ---------------------------------------------------------------------------
@@ -484,6 +484,46 @@ export async function GET(req: NextRequest) {
       });
     }
 
+    // -----------------------------------------------------------------------
+    // vault_stats
+    // -----------------------------------------------------------------------
+    if (api === 'vault_stats') {
+      const allPayments = await db.select().from(payments);
+      const allWithdrawals = await db.select().from(withdrawals).orderBy(desc(withdrawals.createdAt));
+
+      const accountMap = new Map<string, {
+        name: string;
+        income: number;
+        withdrawn: number;
+        balance: number;
+        currency: string;
+      }>();
+
+      for (const p of allPayments) {
+        if (p.status !== 'paid' || !p.accountInfo || p.accountInfo.trim() === '') continue;
+        const acc = p.accountInfo.trim();
+        if (!accountMap.has(acc)) {
+          accountMap.set(acc, { name: acc, income: 0, withdrawn: 0, balance: 0, currency: p.currency || 'TRY' });
+        }
+        accountMap.get(acc)!.income += p.amount;
+        accountMap.get(acc)!.balance += p.amount;
+      }
+
+      for (const w of allWithdrawals) {
+        const acc = w.accountName.trim();
+        if (!accountMap.has(acc)) {
+          accountMap.set(acc, { name: acc, income: 0, withdrawn: 0, balance: 0, currency: w.currency || 'TRY' });
+        }
+        accountMap.get(acc)!.withdrawn += w.amount;
+        accountMap.get(acc)!.balance -= w.amount;
+      }
+
+      return ok({
+        accounts: Array.from(accountMap.values()),
+        history: allWithdrawals
+      });
+    }
+
     return fail('Unknown API endpoint');
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Internal server error';
@@ -803,6 +843,37 @@ export async function POST(req: NextRequest) {
       }
 
       return ok({ to_period: toPeriod, carried_over: remaining });
+    }
+
+    // -----------------------------------------------------------------------
+    // vault_withdraw
+    // -----------------------------------------------------------------------
+    if (api === 'vault_withdraw') {
+      const { account_name, amount, currency, date, notes } = body;
+      if (!account_name || !amount || !date) {
+        return fail('Missing required fields');
+      }
+
+      await db.insert(withdrawals).values({
+        accountName: account_name,
+        amount: parseFloat(amount),
+        currency: currency || 'TRY',
+        date,
+        notes: notes || null
+      });
+
+      return ok({ message: 'Withdrawal created' });
+    }
+
+    // -----------------------------------------------------------------------
+    // vault_withdraw_delete
+    // -----------------------------------------------------------------------
+    if (api === 'vault_withdraw_delete') {
+      const id = parseInt(body.id, 10);
+      if (!id) return fail('Missing id');
+
+      await db.delete(withdrawals).where(eq(withdrawals.id, id));
+      return ok({ message: 'Withdrawal deleted' });
     }
 
     return fail('Unknown API endpoint');

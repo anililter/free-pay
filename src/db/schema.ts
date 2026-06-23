@@ -38,3 +38,13 @@ export const settings = sqliteTable('settings', {
   key: text('key').primaryKey(),
   value: text('value'),
 });
+
+export const withdrawals = sqliteTable('withdrawals', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  accountName: text('account_name').notNull(),
+  amount: real('amount').notNull(),
+  currency: text('currency').notNull().default('TRY'),
+  date: text('date').notNull(),
+  notes: text('notes'),
+  createdAt: text('created_at').notNull().$defaultFn(() => new Date().toISOString()),
+});

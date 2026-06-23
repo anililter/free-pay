@@ -908,6 +908,10 @@
                 <i data-lucide="bar-chart-3" style="width: 15px; height: 15px;"></i>
                 <span>Grafikler & Raporlar</span>
             </button>
+            <button class="tab-btn" onclick="switchTab('kasa', this)">
+                <i data-lucide="wallet" style="width: 15px; height: 15px;"></i>
+                <span>Kasa & Hesaplar</span>
+            </button>
             <button class="tab-btn" onclick="switchTab('clients', this)">
                 <i data-lucide="handshake" style="width: 15px; height: 15px;"></i>
                 <span>Müşteriler & Anlaşmalar</span>
@@ -1127,6 +1131,41 @@
                         </thead>
                         <tbody id="accumulatedDebtsBody">
                             <tr><td colspan="5" style="text-align:center; color:hsl(var(--text-muted)); padding:20px;">Raporlar sekmesine geçince yüklenir...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= TAB KASA: VAULT & ACCOUNTS ================= -->
+        <div id="tabViewKasa" class="tab-content">
+            <div class="panel">
+                <div class="panel-header" style="justify-content: space-between;">
+                    <h2>Kasa & Hesap Bakiyeleri</h2>
+                </div>
+                <!-- Kasa Accounts Grid -->
+                <div id="kasaGrid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-top: 16px;">
+                    <!-- Will be populated by JS -->
+                </div>
+            </div>
+
+            <div class="panel" style="margin-top: 24px;">
+                <div class="panel-header">
+                    <h2>Son Çekim İşlemleri</h2>
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Tarih</th>
+                                <th>Hesap</th>
+                                <th>Açıklama / Not</th>
+                                <th style="text-align: right;">Çekilen Tutar</th>
+                                <th style="width: 40px;"></th>
+                            </tr>
+                        </thead>
+                        <tbody id="kasaHistoryTableBody">
+                            <!-- Populated by JS -->
                         </tbody>
                     </table>
                 </div>
@@ -1405,6 +1444,41 @@
             </div>
         </div>
 
+    </div>
+
+    <!-- MODAL: Kasa Para Çekme -->
+    <div class="modal-backdrop" id="kasaWithdrawModal">
+        <div class="modal-card" style="max-width: 450px;">
+            <div class="modal-header">
+                <h3 class="modal-title" id="kwModalTitle">Kasa Çıkışı</h3>
+                <button class="modal-close" onclick="closeKasaWithdrawModal()"><i data-lucide="x" style="width:16px;height:16px;"></i></button>
+            </div>
+            <div class="modal-body">
+                <form id="kwForm" onsubmit="submitKasaWithdraw(event)">
+                    <input type="hidden" id="kwAccountName">
+                    <div class="form-group">
+                        <label class="form-label">Hesap Adı</label>
+                        <input type="text" id="kwAccountDisplay" class="form-input" disabled>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Çekilecek Tutar</label>
+                        <input type="number" id="kwAmount" class="form-input" required min="1" step="0.01">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Tarih</label>
+                        <input type="date" id="kwDate" class="form-input" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Açıklama / Not</label>
+                        <textarea id="kwNotes" class="form-input" rows="2" placeholder="Nereye, kime ödendi?"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn" style="background: hsl(var(--bg-base)); color: hsl(var(--text-primary)); border: 1px solid hsl(var(--border-color));" onclick="closeKasaWithdrawModal()">İptal</button>
+                <button type="submit" form="kwForm" class="btn" id="kwSaveBtn" style="background: hsl(var(--danger));">Kaydet</button>
+            </div>
+        </div>
     </div>
 
     <!-- MODAL: Tahsilat (Ödeme) -->
@@ -1784,6 +1858,9 @@
             document.getElementById('tabViewReports').classList.remove('active');
             document.getElementById('tabViewClients').classList.remove('active');
             document.getElementById('tabViewSettings').classList.remove('active');
+            if (document.getElementById('tabViewKasa')) {
+                document.getElementById('tabViewKasa').classList.remove('active');
+            }
             if (document.getElementById('tabViewGemini')) {
                 document.getElementById('tabViewGemini').classList.remove('active');
             }
@@ -1807,6 +1884,11 @@
             } else if (tabName === 'gemini') {
                 document.getElementById('tabViewGemini').classList.add('active');
                 loadGeminiTab();
+            } else if (tabName === 'kasa') {
+                if (document.getElementById('tabViewKasa')) {
+                    document.getElementById('tabViewKasa').classList.add('active');
+                    loadKasa();
+                }
             } else {
                 document.getElementById('tabViewClients').classList.add('active');
                 renderBrands();
@@ -3572,6 +3654,168 @@
             const period = document.getElementById('pmPeriod').value;
             closePaymentModal();
             carryOver(clientId, period);
+        };
+
+        // Kasa Functions
+        window.loadKasa = async function() {
+            try {
+                const res = await fetch('/api/legacy?api=vault_stats');
+                const result = await res.json();
+                if (result.success) {
+                    renderKasaGrid(result.data.accounts || []);
+                    renderKasaHistory(result.data.history || []);
+                }
+            } catch(e) {
+                console.error(e);
+            }
+        };
+
+        function renderKasaGrid(accounts) {
+            const grid = document.getElementById('kasaGrid');
+            grid.innerHTML = '';
+            
+            if (accounts.length === 0) {
+                grid.innerHTML = '<div style="color: hsl(var(--text-muted));">Henüz tahsilat yapılmış bir hesap bulunmuyor.</div>';
+                return;
+            }
+
+            accounts.forEach(acc => {
+                const cardHtml = `
+                    <div style="background: white; padding: 20px; border-radius: 12px; border: 1px solid hsl(var(--border-color)); box-shadow: 0 4px 12px rgba(0,0,0,0.02); display: flex; flex-direction: column;">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px;">
+                            <div>
+                                <h3 style="margin: 0; font-size: 16px; font-weight: 800; color: hsl(var(--text-primary));">${escapeHtml(acc.name)}</h3>
+                                <span style="font-size: 12px; color: hsl(var(--text-secondary));">Kasa Hesabı</span>
+                            </div>
+                            <div style="background: hsla(var(--primary-rgb), 0.1); width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: hsl(var(--primary));">
+                                <i data-lucide="wallet" style="width: 18px; height: 18px;"></i>
+                            </div>
+                        </div>
+                        <div style="display: flex; flex-direction: column; gap: 8px; flex: 1;">
+                            <div style="display: flex; justify-content: space-between; font-size: 13px;">
+                                <span style="color: hsl(var(--text-secondary));">Toplam Gelen:</span>
+                                <span style="font-weight: 700; color: hsl(var(--success));">+${formatCurrency(acc.income, acc.currency)}</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; font-size: 13px;">
+                                <span style="color: hsl(var(--text-secondary));">Toplam Çekilen:</span>
+                                <span style="font-weight: 700; color: hsl(var(--danger));">-${formatCurrency(acc.withdrawn, acc.currency)}</span>
+                            </div>
+                        </div>
+                        <div style="margin-top: 16px; padding-top: 16px; border-top: 1px dashed hsl(var(--border-color)); display: flex; justify-content: space-between; align-items: center;">
+                            <div style="display: flex; flex-direction: column;">
+                                <span style="font-size: 11px; color: hsl(var(--text-muted)); font-weight: 600;">MEVCUT BAKİYE</span>
+                                <span style="font-size: 20px; font-weight: 900; color: hsl(var(--text-primary));">${formatCurrency(acc.balance, acc.currency)}</span>
+                            </div>
+                            <button class="btn btn-primary" style="padding: 6px 12px; font-size: 12px;" onclick="openKasaWithdrawModal('${escapeHtml(acc.name)}')">Para Çek</button>
+                        </div>
+                    </div>
+                `;
+                grid.insertAdjacentHTML('beforeend', cardHtml);
+            });
+            lucide.createIcons();
+        }
+
+        function renderKasaHistory(history) {
+            const tbody = document.getElementById('kasaHistoryTableBody');
+            tbody.innerHTML = '';
+            
+            if (history.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: hsl(var(--text-muted)); padding: 24px;">Henüz hiç para çekilmemiş.</td></tr>';
+                return;
+            }
+
+            history.forEach(item => {
+                const [y, m, d] = item.date.split('-');
+                const html = `
+                    <tr>
+                        <td style="padding: 12px 18px; font-weight: 600; color: hsl(var(--text-primary));">${d}.${m}.${y}</td>
+                        <td style="padding: 12px 18px;">
+                            <span style="background: hsla(var(--primary-rgb), 0.1); color: hsl(var(--primary)); padding: 4px 8px; border-radius: 6px; font-size: 12px; font-weight: 700;">
+                                ${escapeHtml(item.accountName)}
+                            </span>
+                        </td>
+                        <td style="padding: 12px 18px; color: hsl(var(--text-secondary)); font-size: 13px;">${escapeHtml(item.notes || '-')}</td>
+                        <td style="padding: 12px 18px; text-align: right; font-weight: 800; color: hsl(var(--danger));">
+                            -${formatCurrency(item.amount, item.currency)}
+                        </td>
+                        <td style="padding: 12px 18px; text-align: center;">
+                            <button class="icon-btn" style="color: hsl(var(--danger)); opacity: 0.6;" onclick="deleteKasaWithdraw(${item.id})" title="Sil">
+                                <i data-lucide="trash-2" style="width:16px;height:16px;"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+                tbody.insertAdjacentHTML('beforeend', html);
+            });
+            lucide.createIcons();
+        }
+
+        window.openKasaWithdrawModal = function(accountName) {
+            document.getElementById('kwAccountName').value = accountName;
+            document.getElementById('kwAccountDisplay').value = accountName;
+            document.getElementById('kwAmount').value = '';
+            document.getElementById('kwDate').value = new Date().toISOString().split('T')[0];
+            document.getElementById('kwNotes').value = '';
+            
+            document.getElementById('kasaWithdrawModal').classList.add('show');
+        };
+
+        window.closeKasaWithdrawModal = function() {
+            document.getElementById('kasaWithdrawModal').classList.remove('show');
+        };
+
+        window.submitKasaWithdraw = async function(e) {
+            e.preventDefault();
+            const btn = document.getElementById('kwSaveBtn');
+            const orig = btn.innerHTML;
+            btn.innerHTML = '...';
+            btn.disabled = true;
+
+            try {
+                const res = await fetch('/api/legacy?api=vault_withdraw', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        account_name: document.getElementById('kwAccountName').value,
+                        amount: document.getElementById('kwAmount').value,
+                        date: document.getElementById('kwDate').value,
+                        notes: document.getElementById('kwNotes').value
+                    })
+                });
+                const result = await res.json();
+                if (result.success) {
+                    showToast('Para çekme işlemi kaydedildi.', 'success');
+                    closeKasaWithdrawModal();
+                    loadKasa();
+                } else {
+                    showToast('Hata: ' + result.error, 'danger');
+                }
+            } catch(err) {
+                showToast('Bağlantı hatası.', 'danger');
+            } finally {
+                btn.innerHTML = orig;
+                btn.disabled = false;
+            }
+        };
+
+        window.deleteKasaWithdraw = async function(id) {
+            if (!confirm('Bu para çekme işlemini silmek istediğinize emin misiniz?')) return;
+            try {
+                const res = await fetch('/api/legacy?api=vault_withdraw_delete', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ id })
+                });
+                const result = await res.json();
+                if (result.success) {
+                    showToast('Çekim işlemi silindi.', 'success');
+                    loadKasa();
+                } else {
+                    showToast('Hata: ' + result.error, 'danger');
+                }
+            } catch(e) {
+                showToast('Bağlantı hatası.', 'danger');
+            }
         };
 
         // Helper to show notifications
