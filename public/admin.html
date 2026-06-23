@@ -1242,10 +1242,32 @@
             <div style="max-width: 650px; margin: 0 auto; display: flex; flex-direction: column; gap: 24px;">
                 <div class="stat-card" style="padding: 28px;">
                     <h3 style="font-size: 17px; font-weight: 800; border-bottom: 1px solid hsl(var(--border-color)); padding-bottom: 12px; margin-bottom: 20px; display: flex; align-items: center; gap: 8px;">
-                        <i data-lucide="mail" style="color:hsl(var(--primary)); width:20px; height:20px;"></i>
-                        <span>E-posta Bildirim Ayarları (SMTP)</span>
+                        <i data-lucide="settings" style="color:hsl(var(--primary)); width:20px; height:20px;"></i>
+                        <span>Sistem ve Yedekleme Ayarları</span>
                     </h3>
                     <form id="settingsForm" onsubmit="saveSettingsForm(event)" style="display:flex; flex-direction:column; gap: 16px;">
+                        <!-- Telegram Ayarları -->
+                        <div style="background: hsla(var(--primary-rgb), 0.05); padding: 16px; border-radius: 8px; border: 1px solid hsla(var(--primary-rgb), 0.2);">
+                            <h4 style="font-weight: 700; color: hsl(var(--text-primary)); margin-bottom: 12px; display: flex; align-items: center; gap: 6px;">
+                                <i data-lucide="send" style="width:16px; height:16px;"></i> Telegram Otomatik Yedekleme
+                            </h4>
+                            <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                                <div class="form-group">
+                                    <label class="form-label" for="settingsTelegramBotToken">Telegram Bot Token</label>
+                                    <input type="password" id="settingsTelegramBotToken" class="form-control" placeholder="BotFather'dan aldığınız token">
+                                </div>
+                                <div class="form-group" style="position: relative;">
+                                    <label class="form-label" for="settingsTelegramChatId">Telegram Chat ID</label>
+                                    <div style="display: flex; gap: 8px;">
+                                        <input type="text" id="settingsTelegramChatId" class="form-control" placeholder="Sohbet ID numaranız">
+                                        <button type="button" class="btn btn-secondary" onclick="fetchTelegramChatId()" style="white-space: nowrap; font-size: 12px; padding: 0 12px;">Chat ID Bul</button>
+                                    </div>
+                                    <small style="color:hsl(var(--text-muted)); font-size:10px; margin-top:4px; display:block; line-height:1.5;">
+                                        BotToken'ı girip kaydedin. Sonra Telegram'dan botunuza 'Merhaba' yazın ve 'Chat ID Bul' butonuna basın.
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
                         <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 16px;">
                             <div class="form-group">
                                 <label class="form-label" for="settingsSmtpHost">SMTP Sunucu (Host) *</label>
@@ -1294,14 +1316,11 @@
                         </div>
                         <div style="display:flex; justify-content:space-between; align-items:center; margin-top:12px; border-top:1px solid hsl(var(--border-color)); padding-top:20px; gap: 12px;">
                             <div style="display:flex; gap: 8px;">
-                                <button type="button" class="btn btn-secondary" onclick="testEmailConnection(this)" style="background:transparent; border:1px solid hsl(var(--border-color)); color:hsl(var(--text-primary)); display:flex; align-items:center; gap:6px; padding: 8px 12px;">
-                                    <i data-lucide="send" style="width:14px; height:14px;"></i> Test Et
-                                </button>
                                 <button type="button" class="btn btn-secondary" onclick="triggerManualReminders(this)" style="background:transparent; border:1px solid hsl(var(--border-color)); color:hsl(var(--text-primary)); display:flex; align-items:center; gap:6px; padding: 8px 12px;">
-                                    <i data-lucide="bell-ring" style="width:14px; height:14px;"></i> Raporu Gönder
+                                    <i data-lucide="bell" style="width:14px; height:14px;"></i> Hatırlatmaları Çalıştır
                                 </button>
                             </div>
-                            <button type="submit" class="btn btn-primary">Ayarları Kaydet</button>
+                            <button type="submit" class="btn btn-primary" id="btnSettingsSave">Ayarları Kaydet</button>
                         </div>
                     </form>
                 </div>
@@ -1310,47 +1329,12 @@
                 <div class="stat-card" style="padding: 28px;">
                     <h3 style="font-size: 17px; font-weight: 800; border-bottom: 1px solid hsl(var(--border-color)); padding-bottom: 12px; margin-bottom: 20px; display: flex; align-items: center; gap: 8px;">
                         <i data-lucide="database" style="color:hsl(var(--primary)); width:20px; height:20px;"></i>
-                        <span>Veritabanı Yedekleme ve Yönetimi</span>
+                        <span>Veritabanı Yönetimi & Yedekleme</span>
                     </h3>
-                    
-                    <div style="display:flex; flex-direction:column; gap: 20px;">
-                        <div>
-                            <label class="form-label" style="margin-bottom: 8px; display: block;">Veritabanını İndir</label>
-                            <div style="display:flex; gap: 12px; align-items: center;">
-                                <input type="date" id="backupDate" class="form-control" style="max-width: 200px;">
-                                <button type="button" class="btn btn-primary" onclick="downloadDatabaseBackup()" style="display:flex; align-items:center; gap:6px;">
-                                    <i data-lucide="download" style="width:16px; height:16px;"></i> Yedek İndir
-                                </button>
-                            </div>
-                            <small style="color:hsl(var(--text-muted)); font-size:11px; margin-top:6px; display:block; line-height:1.4;">
-                                Seçtiğiniz tarih dosya ismine eklenecektir. Tüm veritabanı JSON formatında indirilir.
-                            </small>
-                        </div>
-                        
-                        <div style="border-top: 1px solid hsl(var(--border-color)); padding-top: 16px;">
-                            <label class="form-label" style="margin-bottom: 8px; display: block;">Veritabanını Geri Yükle</label>
-                            <div style="display:flex; gap: 12px; align-items: center;">
-                                <input type="file" id="restoreFile" accept=".json" class="form-control" style="padding: 6px 12px; max-width: 320px;">
-                                <button type="button" class="btn" onclick="restoreDatabaseBackup()" style="background:hsl(var(--error)); border:none; color:white; display:flex; align-items:center; gap:6px; padding: 10px 16px; border-radius: 8px; font-weight: 600; cursor: pointer;">
-                                    <i data-lucide="upload" style="width:16px; height:16px;"></i> Yedek Yükle
-                                </button>
-                            </div>
-                            <small style="color:hsl(var(--error)); font-size:11px; font-weight:500; margin-top:6px; display:block; line-height:1.4;">
-                                ⚠️ DİKKAT: Yedek yükleme işlemi mevcut tüm müşteri ve ödeme verilerinizi kalıcı olarak siler ve yedekteki verileri yazar. Bu işlem geri alınamaz!
-                            </small>
-                        </div>
-
-                        <div style="border-top: 1px solid hsl(var(--border-color)); padding-top: 16px;">
-                            <label class="form-label" style="margin-bottom: 8px; display: block;">E-posta ile Yedek Gönder</label>
-                            <div>
-                                <button type="button" class="btn btn-secondary" onclick="sendBackupEmailManual(this)" style="background:transparent; border:1px solid hsl(var(--border-color)); color:hsl(var(--text-primary)); display:flex; align-items:center; gap:6px; padding: 10px 16px;">
-                                    <i data-lucide="mail" style="width:16px; height:16px;"></i> E-posta Yedek Gönder
-                                </button>
-                            </div>
-                            <small style="color:hsl(var(--text-muted)); font-size:11px; margin-top:6px; display:block; line-height:1.4;">
-                                Tüm veritabanı yedeğini e-posta eki (JSON) olarak bildirim e-posta adresinize manuel olarak anında gönderir.
-                            </small>
-                        </div>
+                    <div style="display: flex; gap: 12px; align-items: center; justify-content: center; padding: 20px 0;">
+                        <button type="button" class="btn btn-primary" onclick="window.open('/api/legacy?api=backup_download', '_blank')" style="display:flex; align-items:center; gap:8px;">
+                            <i data-lucide="download" style="width:16px; height:16px;"></i> Tüm Verileri İndir (.json)
+                        </button>
                     </div>
                 </div>
 
@@ -2674,19 +2658,16 @@
                 const response = await fetch('/api/legacy?api=settings_get');
                 const result = await response.json();
                 if (result.success) {
-                    const data = result.data;
-                    document.getElementById('settingsSmtpHost').value = data.smtp_host || '';
-                    document.getElementById('settingsSmtpPort').value = data.smtp_port || '';
-                    document.getElementById('settingsSmtpSecure').value = data.smtp_secure || 'tls';
-                    document.getElementById('settingsNotificationEmail').value = data.notification_email || '';
-                    document.getElementById('settingsSmtpUser').value = data.smtp_user || '';
-                    document.getElementById('settingsSmtpPass').value = data.smtp_pass || '';
-                    document.getElementById('settingsGeminiApiKey').value = data.gemini_api_key || '';
-                    
-                    const backupDateInput = document.getElementById('backupDate');
-                    if (backupDateInput) {
-                        backupDateInput.value = new Date().toISOString().split('T')[0];
-                    }
+                    const settingsData = result.data;
+                    document.getElementById('settingsSmtpHost').value = settingsData.smtp_host || '';
+                    document.getElementById('settingsSmtpPort').value = settingsData.smtp_port || '';
+                    document.getElementById('settingsSmtpSecure').value = settingsData.smtp_secure || 'tls';
+                    document.getElementById('settingsNotificationEmail').value = settingsData.notification_email || '';
+                    document.getElementById('settingsSmtpUser').value = settingsData.smtp_user || '';
+                    document.getElementById('settingsSmtpPass').value = settingsData.smtp_pass || '';
+                    document.getElementById('settingsTelegramBotToken').value = settingsData.telegram_bot_token || '';
+                    document.getElementById('settingsTelegramChatId').value = settingsData.telegram_chat_id || '';
+                    document.getElementById('settingsGeminiApiKey').value = settingsData.gemini_api_key || '';
                 }
             } catch (err) {
                 console.error(err);
@@ -2703,6 +2684,8 @@
                 notification_email: document.getElementById('settingsNotificationEmail').value,
                 smtp_user: document.getElementById('settingsSmtpUser').value,
                 smtp_pass: document.getElementById('settingsSmtpPass').value,
+                telegram_bot_token: document.getElementById('settingsTelegramBotToken').value,
+                telegram_chat_id: document.getElementById('settingsTelegramChatId').value,
                 gemini_api_key: document.getElementById('settingsGeminiApiKey').value
             };
 
@@ -2714,7 +2697,7 @@
                 });
                 const result = await response.json();
                 if (result.success) {
-                    showToast('E-posta ayarları başarıyla kaydedildi.', 'success');
+                    showToast('Ayarlar başarıyla kaydedildi.', 'success');
                 } else {
                     showToast('Hata: ' + result.error, 'danger');
                 }
@@ -2724,10 +2707,27 @@
             }
         };
 
-        window.downloadDatabaseBackup = function() {
-            const dateInput = document.getElementById('backupDate');
-            const dateVal = dateInput.value || new Date().toISOString().split('T')[0];
-            window.location.href = '/api/legacy?api=backup_download&date=' + encodeURIComponent(dateVal);
+        window.fetchTelegramChatId = async function() {
+            const token = document.getElementById('settingsTelegramBotToken').value;
+            if (!token) {
+                alert('Lütfen önce Telegram Bot Token bilgisini girin ve Ayarları Kaydedin.');
+                return;
+            }
+
+            try {
+                showToast('Telegram üzerinden güncellemeler kontrol ediliyor...', 'info');
+                const res = await fetch('/api/legacy?api=telegram_get_chat_id');
+                const result = await res.json();
+
+                if (result.success && result.chat_id) {
+                    document.getElementById('settingsTelegramChatId').value = result.chat_id;
+                    showToast('Chat ID başarıyla bulundu! Lütfen ayarları kaydedin.', 'success');
+                } else {
+                    alert('Hata: ' + (result.error || 'Hiç mesaj bulunamadı. Lütfen Telegram uygulamasından botunuza "Merhaba" vb. bir mesaj gönderin ve tekrar deneyin.'));
+                }
+            } catch(e) {
+                showToast('Bağlantı hatası.', 'danger');
+            }
         };
 
         window.restoreDatabaseBackup = async function() {

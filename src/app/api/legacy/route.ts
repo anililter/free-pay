@@ -479,7 +479,71 @@ export async function GET(req: NextRequest) {
           notification_email: result.notification_email ?? '',
           smtp_user: result.smtp_user ?? '',
           smtp_pass: result.smtp_pass ?? '',
+          telegram_bot_token: result.telegram_bot_token ?? '',
+          telegram_chat_id: result.telegram_chat_id ?? '',
           gemini_api_key: result.gemini_api_key ?? '',
+        },
+      });
+    }
+
+    // -----------------------------------------------------------------------
+    // telegram_get_chat_id
+    // -----------------------------------------------------------------------
+    if (api === 'telegram_get_chat_id') {
+      const rows = await db.select().from(settings).where(eq(settings.key, 'telegram_bot_token'));
+      const token = rows.length > 0 ? rows[0].value : null;
+
+      if (!token) {
+        return fail('Telegram Bot Token bulunamadı. Lütfen önce kaydedin.');
+      }
+
+      const res = await fetch(`https://api.telegram.org/bot${token}/getUpdates`);
+      const json = await res.json();
+
+      if (!json.ok) {
+        return fail(`Telegram API Hatası: ${json.description}`);
+      }
+
+      const updates = json.result;
+      if (!updates || updates.length === 0) {
+        return fail('Mesaj bulunamadı. Lütfen Telegram uygulamasından botunuza "Merhaba" yazın ve tekrar deneyin.');
+      }
+
+      // Get the latest message's chat ID
+      const latestMessage = updates[updates.length - 1];
+      const chatId = latestMessage.message?.chat?.id;
+
+      if (!chatId) {
+        return fail('Son olayda geçerli bir mesaj (Chat ID) bulunamadı.');
+      }
+
+      return ok({ chat_id: chatId.toString() });
+    }
+
+    // -----------------------------------------------------------------------
+    // backup_download
+    // -----------------------------------------------------------------------
+    if (api === 'backup_download') {
+      const allClients = await db.select().from(clients);
+      const allPayments = await db.select().from(payments);
+      const allSettings = await db.select().from(settings);
+      const allVaultTx = await db.select().from(vaultTransactions);
+
+      const backupData = {
+        date: new Date().toISOString(),
+        clients: allClients,
+        payments: allPayments,
+        settings: allSettings,
+        vaultTransactions: allVaultTx,
+      };
+
+      const jsonStr = JSON.stringify(backupData, null, 2);
+      const fileName = `freepay-backup-${new Date().toISOString().split('T')[0]}.json`;
+
+      return new NextResponse(jsonStr, {
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Disposition': `attachment; filename="${fileName}"`,
         },
       });
     }
