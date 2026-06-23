@@ -519,8 +519,10 @@ export async function GET(req: NextRequest) {
       }
 
       return ok({
-        accounts: Array.from(accountMap.values()),
-        history: allWithdrawals
+        data: {
+          accounts: Array.from(accountMap.values()),
+          history: allWithdrawals
+        }
       });
     }
 
