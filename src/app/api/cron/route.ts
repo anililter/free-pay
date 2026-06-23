@@ -66,7 +66,7 @@ export async function GET(req: NextRequest) {
     }
 
     return new NextResponse('Backup sent successfully', { status: 200 });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Cron Error:', error);
     return new NextResponse('Internal Error', { status: 500 });
   }
