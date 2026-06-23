@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
-import { clients, payments, settings, withdrawals } from '@/db/schema';
+import { clients, payments, settings, vaultTransactions } from '@/db/schema';
 import { eq, and, sql, asc, desc, gte, lte, inArray } from 'drizzle-orm';
 
 // ---------------------------------------------------------------------------
