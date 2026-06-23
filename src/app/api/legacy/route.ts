@@ -357,23 +357,39 @@ export async function GET(req: NextRequest) {
       }));
 
       // ------- delay_stats ----------------------------------------------------
+      // Only consider payments from the last 6 months to give a fresh average
+      const sixMonthsAgoDate = new Date();
+      sixMonthsAgoDate.setMonth(sixMonthsAgoDate.getMonth() - 6);
+      const sixMonthsAgoStr = sixMonthsAgoDate.toISOString().substring(0, 10);
+
       const allPaidPayments = await db
         .select()
         .from(payments)
-        .where(eq(payments.status, 'paid'));
+        .where(
+          and(
+            inArray(payments.status, ['paid', 'partial']),
+            sql`${payments.dueDate} >= ${sixMonthsAgoStr}`
+          )
+        );
+
+      // We need client names for all clients, even if not active today
+      const allClientsForDelay = await db.select().from(clients);
 
       const clientDelayMap = new Map<number, { totalDelay: number; count: number; name: string; project: string }>();
       for (const p of allPaidPayments) {
         if (!p.paidDate || !p.dueDate) continue;
         const delay = daysDiff(p.paidDate, p.dueDate);
+        // Only count positive delays
+        if (delay < 0) continue; 
+        
         if (!clientDelayMap.has(p.clientId)) {
-          // Look up client name
-          const c = activeClients.find((cl) => cl.id === p.clientId);
+          const c = allClientsForDelay.find((cl) => cl.id === p.clientId);
+          if (!c) continue;
           clientDelayMap.set(p.clientId, {
             totalDelay: 0,
             count: 0,
-            name: c?.name ?? '',
-            project: c?.projectName ?? '',
+            name: c.name,
+            project: c.projectName,
           });
         }
         const entry = clientDelayMap.get(p.clientId)!;
@@ -385,8 +401,9 @@ export async function GET(req: NextRequest) {
         .map((e) => ({
           client_name: e.name,
           project_name: e.project,
-          avg_delay_days: Math.round((e.totalDelay / e.count) * 100) / 100,
-        }));
+          avg_delay_days: Math.round((e.totalDelay / e.count) * 10) / 10,
+        }))
+        .sort((a, b) => b.avg_delay_days - a.avg_delay_days);
 
       // ------- report_metrics -------------------------------------------------
       const currentYear = now.getFullYear();
@@ -424,41 +441,64 @@ export async function GET(req: NextRequest) {
       };
 
       // ------- client_earnings ------------------------------------------------
+      const allPaidEarnings = await db.select().from(payments).where(inArray(payments.status, ['paid', 'partial']));
+      const allClientsForEarnings = await db.select().from(clients);
+      
       const clientEarningsMap = new Map<number, {
         client_name: string;
         project_name: string;
-        total_expected: number;
         total_paid: number;
         currency: string;
       }>();
 
-      for (const row of data) {
-        const cid = row.client_id as number;
-        if (!clientEarningsMap.has(cid)) {
-          clientEarningsMap.set(cid, {
-            client_name: row.client_name as string,
-            project_name: row.project_name as string,
-            total_expected: 0,
-            total_paid: 0,
-            currency: row.currency as string,
-          });
-        }
-        const entry = clientEarningsMap.get(cid)!;
-        entry.total_expected += (row.agreed_amount as number) || 0;
-        if (row.status === 'paid' || row.status === 'partial') {
-          entry.total_paid += (row.paid_amount as number) || 0;
+      for (const c of allClientsForEarnings) {
+        clientEarningsMap.set(c.id, {
+          client_name: c.name,
+          project_name: c.projectName,
+          total_paid: 0,
+          currency: c.currency
+        });
+      }
+
+      for (const p of allPaidEarnings) {
+        if (clientEarningsMap.has(p.clientId)) {
+          clientEarningsMap.get(p.clientId)!.total_paid += p.amount;
         }
       }
-      const clientEarnings = Array.from(clientEarningsMap.values());
+
+      const clientEarnings = Array.from(clientEarningsMap.values())
+        .filter(e => e.total_paid > 0)
+        .sort((a, b) => b.total_paid - a.total_paid);
+
+      // ------- paid_this_month metrics ----------------------------------------
+      const targetMonthStr = periodEnd; // e.g., "2026-06"
+      const allPaymentsPaidThisMonth = await db.select().from(payments)
+        .where(
+          and(
+            inArray(payments.status, ['paid', 'partial']),
+            sql`substr(${payments.paidDate}, 1, 7) = ${targetMonthStr}`
+          )
+        );
+      
+      let paidThisMonthAmount = 0;
+      let paidLateAmount = 0;
+      for (const p of allPaymentsPaidThisMonth) {
+        if (p.period === targetMonthStr) {
+          paidThisMonthAmount += p.amount;
+        } else {
+          paidLateAmount += p.amount;
+        }
+      }
 
       return ok({
         data,
-        account_options: Array.from(accountSet),
         monthly_stats: monthlyStats,
         account_stats: accountStats,
         delay_stats: delayStats,
         report_metrics: reportMetrics,
         client_earnings: clientEarnings,
+        paid_this_month_amount: paidThisMonthAmount,
+        paid_late_amount: paidLateAmount
       });
     }
 

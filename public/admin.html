@@ -1078,11 +1078,9 @@
                     <table class="payment-table">
                         <thead>
                             <tr>
-                                <th width="30%">Marka / Müşteri</th>
-                                <th width="20%">Hizmet / Proje</th>
-                                <th width="15%" style="text-align: right;">Toplam Beklenen</th>
-                                <th width="15%" style="text-align: right;">Toplam Tahsil Edilen</th>
-                                <th width="20%" style="text-align: right;">Tahsilat Oranı</th>
+                                <th width="50%">Marka / Müşteri</th>
+                                <th width="25%">Hizmet / Proje</th>
+                                <th width="25%" style="text-align: right;">Toplam Tahsil Edilen (Tüm Zamanlar)</th>
                             </tr>
                         </thead>
                         <tbody id="brandEarningsTableBody">
@@ -2081,6 +2079,8 @@
                     window.lastDelayStats = result.delay_stats;
                     window.lastReportMetrics = result.report_metrics;
                     window.lastClientEarnings = result.client_earnings;
+                    window.paidThisMonthAmount = result.paid_this_month_amount || 0;
+                    window.paidLateAmount = result.paid_late_amount || 0;
 
                     updateAccountDatalist();
                     renderTable();
@@ -2156,9 +2156,8 @@
                 }
                 
                 if (isPaid) {
-                    totalPaid += amount;
+                    // Do nothing for totalPaid, we use backend metrics for paid logic now
                 } else if (isPartial) {
-                    totalPaid += paid;
                     const remaining = amount - paid;
                     if (isOverdue) {
                         totalOverdue += remaining;
@@ -2171,7 +2170,23 @@
                             overdueOlder += remaining;
                         }
                     } else {
-                        if (!periodEndStr || p.due_date <= periodEndStr) {
+                        // Pending logic: only show from end of this month (25th to 31st) to next month's 5th
+                        const dDate = new Date(p.due_date);
+                        const currentY = dDate.getFullYear();
+                        const currentM = dDate.getMonth();
+                        // Find the start of the "end of month" period (e.g. 25th)
+                        const pendingStart = new Date(currentY, currentM, 25);
+                        // Find the end of the "next month's 5th" period
+                        const pendingEnd = new Date(currentY, currentM + 1, 5);
+                        
+                        // We should base the window on TODAY
+                        const tDate = new Date();
+                        const tY = tDate.getFullYear();
+                        const tM = tDate.getMonth();
+                        const activePendingStart = new Date(tY, tM, 25);
+                        const activePendingEnd = new Date(tY, tM + 1, 5);
+                        
+                        if (dDate >= activePendingStart && dDate <= activePendingEnd) {
                             totalPending += remaining;
                         }
                     }
@@ -2188,15 +2203,30 @@
                             overdueOlder += amount;
                         }
                     } else {
-                        if (!periodEndStr || p.due_date <= periodEndStr) {
+                        // Pending logic
+                        const dDate = new Date(p.due_date);
+                        const tDate = new Date();
+                        const tY = tDate.getFullYear();
+                        const tM = tDate.getMonth();
+                        const activePendingStart = new Date(tY, tM, 25);
+                        const activePendingEnd = new Date(tY, tM + 1, 5);
+                        
+                        if (dDate >= activePendingStart && dDate <= activePendingEnd) {
                             totalPending += amount;
                         }
                     }
                 }
             });
 
+            const totalPaidThisMonth = window.paidThisMonthAmount || 0;
+            const totalPaidLate = window.paidLateAmount || 0;
+            totalPaid = totalPaidThisMonth + totalPaidLate;
+
             document.getElementById('statTotalExpected').textContent = formatCurrency(totalExpected, 'TRY');
             document.getElementById('statTotalPaid').textContent = formatCurrency(totalPaid, 'TRY');
+            document.getElementById('paidThisMonthVal').textContent = formatCurrency(totalPaidThisMonth, 'TRY');
+            document.getElementById('paidLateVal').textContent = formatCurrency(totalPaidLate, 'TRY');
+            
             document.getElementById('statTotalOverdue').textContent = formatCurrency(totalOverdue, 'TRY');
             document.getElementById('statTotalPending').textContent = formatCurrency(totalPending, 'TRY');
             
@@ -2535,33 +2565,18 @@
             const tbody = document.getElementById('brandEarningsTableBody');
             tbody.innerHTML = '';
             if (!earnings || earnings.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:hsl(var(--text-muted));">Gelir verisi bulunmuyor.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; color:hsl(var(--text-muted));">Gelir verisi bulunmuyor.</td></tr>';
                 return;
             }
 
             earnings.forEach(stat => {
                 const totalPaid = parseFloat(stat.total_paid) || 0;
-                const totalExpected = parseFloat(stat.total_expected) || 0;
-                const rate = totalExpected > 0 ? Math.round((totalPaid / totalExpected) * 100) : 0;
-                
-                let rateClass = 'danger';
-                if (rate >= 90) rateClass = 'paid';
-                else if (rate >= 50) rateClass = 'upcoming';
 
                 const rowHtml = `
                     <tr>
                         <td style="padding: 12px 18px;"><div style="font-weight:700; color:hsl(var(--text-primary));">${escapeHtml(stat.client_name)}</div></td>
                         <td style="padding: 12px 18px;"><div style="color:hsl(var(--text-secondary)); font-size:12px;">${escapeHtml(stat.project_name)}</div></td>
-                        <td style="padding: 12px 18px; text-align: right;"><div style="font-weight:700; color:hsl(var(--text-secondary));">${formatCurrency(totalExpected, stat.currency)}</div></td>
-                        <td style="padding: 12px 18px; text-align: right;"><div style="font-weight:700; color:hsl(var(--text-primary));">${formatCurrency(totalPaid, stat.currency)}</div></td>
-                        <td style="padding: 12px 18px; text-align: right;">
-                            <div style="display:flex; align-items:center; justify-content:flex-end; gap:8px;">
-                                <div style="width:60px; height:6px; background:hsl(var(--border-color)); border-radius:3px; overflow:hidden;">
-                                    <div style="width:${rate}%; height:100%; background:var(--${rateClass === 'paid' ? 'success' : (rateClass === 'upcoming' ? 'info' : 'danger')});"></div>
-                                </div>
-                                <span class="status-badge ${rateClass}" style="min-width:40px; text-align:center; padding: 2px 4px; font-size:10px;">%${rate}</span>
-                            </div>
-                        </td>
+                        <td style="padding: 12px 18px; text-align: right;"><div style="font-weight:900; font-size: 15px; color:hsl(var(--success));">${formatCurrency(totalPaid, stat.currency)}</div></td>
                     </tr>
                 `;
                 tbody.insertAdjacentHTML('beforeend', rowHtml);
