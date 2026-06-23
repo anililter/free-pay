@@ -1151,7 +1151,7 @@
 
             <div class="panel" style="margin-top: 24px;">
                 <div class="panel-header">
-                    <h2>Son Çekim İşlemleri</h2>
+                    <h2>Hesap İşlem Geçmişi (Ledger)</h2>
                 </div>
                 <div class="table-container">
                     <table>
@@ -1159,9 +1159,10 @@
                             <tr>
                                 <th>Tarih</th>
                                 <th>Hesap</th>
-                                <th>Açıklama / Not</th>
-                                <th style="text-align: right;">Çekilen Tutar</th>
-                                <th style="width: 40px;"></th>
+                                <th>İşlem Tipi</th>
+                                <th>Açıklama / Müşteri</th>
+                                <th style="text-align: right;">Tutar</th>
+                                <th style="width: 70px;"></th>
                             </tr>
                         </thead>
                         <tbody id="kasaHistoryTableBody">
@@ -1446,37 +1447,45 @@
 
     </div>
 
-    <!-- MODAL: Kasa Para Çekme -->
-    <div class="modal-backdrop" id="kasaWithdrawModal">
+    <!-- MODAL: Kasa İşlemi (Giriş/Çıkış) -->
+    <div class="modal-backdrop" id="kasaTransactionModal">
         <div class="modal-card" style="max-width: 450px;">
             <div class="modal-header">
-                <h3 class="modal-title" id="kwModalTitle">Kasa Çıkışı</h3>
-                <button class="modal-close" onclick="closeKasaWithdrawModal()"><i data-lucide="x" style="width:16px;height:16px;"></i></button>
+                <h3 class="modal-title" id="ktModalTitle">Kasa İşlemi</h3>
+                <button class="modal-close" onclick="closeKasaTransactionModal()"><i data-lucide="x" style="width:16px;height:16px;"></i></button>
             </div>
             <div class="modal-body">
-                <form id="kwForm" onsubmit="submitKasaWithdraw(event)">
-                    <input type="hidden" id="kwAccountName">
+                <form id="ktForm" onsubmit="submitKasaTransaction(event)">
+                    <input type="hidden" id="ktId">
+                    <input type="hidden" id="ktAccountName">
                     <div class="form-group">
                         <label class="form-label">Hesap Adı</label>
-                        <input type="text" id="kwAccountDisplay" class="form-input" disabled>
+                        <input type="text" id="ktAccountDisplay" class="form-input" disabled>
                     </div>
                     <div class="form-group">
-                        <label class="form-label">Çekilecek Tutar</label>
-                        <input type="number" id="kwAmount" class="form-input" required min="1" step="0.01">
+                        <label class="form-label">İşlem Yönü</label>
+                        <select id="ktType" class="form-input" required>
+                            <option value="income">Para Girişi (Gelir)</option>
+                            <option value="expense">Para Çıkışı (Gider/Çekim)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Tutar</label>
+                        <input type="number" id="ktAmount" class="form-input" required min="0.01" step="0.01">
                     </div>
                     <div class="form-group">
                         <label class="form-label">Tarih</label>
-                        <input type="date" id="kwDate" class="form-input" required>
+                        <input type="date" id="ktDate" class="form-input" required>
                     </div>
                     <div class="form-group">
                         <label class="form-label">Açıklama / Not</label>
-                        <textarea id="kwNotes" class="form-input" rows="2" placeholder="Nereye, kime ödendi?"></textarea>
+                        <textarea id="ktNotes" class="form-input" rows="2" placeholder="Nereden geldi, nereye gitti?"></textarea>
                     </div>
                 </form>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn" style="background: hsl(var(--bg-base)); color: hsl(var(--text-primary)); border: 1px solid hsl(var(--border-color));" onclick="closeKasaWithdrawModal()">İptal</button>
-                <button type="submit" form="kwForm" class="btn" id="kwSaveBtn" style="background: hsl(var(--danger));">Kaydet</button>
+                <button type="button" class="btn" style="background: hsl(var(--bg-base)); color: hsl(var(--text-primary)); border: 1px solid hsl(var(--border-color));" onclick="closeKasaTransactionModal()">İptal</button>
+                <button type="submit" form="ktForm" class="btn btn-primary" id="ktSaveBtn">Kaydet</button>
             </div>
         </div>
     </div>
@@ -3706,7 +3715,10 @@
                                 <span style="font-size: 11px; color: hsl(var(--text-muted)); font-weight: 600;">MEVCUT BAKİYE</span>
                                 <span style="font-size: 20px; font-weight: 900; color: hsl(var(--text-primary));">${formatCurrency(acc.balance, acc.currency)}</span>
                             </div>
-                            <button class="btn btn-primary" style="padding: 6px 12px; font-size: 12px;" onclick="openKasaWithdrawModal('${escapeHtml(acc.name)}')">Para Çek</button>
+                            <div style="display: flex; gap: 8px;">
+                                <button class="btn" style="padding: 6px 12px; font-size: 12px; background: hsl(var(--success)); color: white;" onclick="openKasaTransactionModal('${escapeHtml(acc.name)}', 'income')">+ Giriş</button>
+                                <button class="btn btn-primary" style="padding: 6px 12px; font-size: 12px;" onclick="openKasaTransactionModal('${escapeHtml(acc.name)}', 'expense')">- Çıkış</button>
+                            </div>
                         </div>
                     </div>
                 `;
@@ -3720,12 +3732,19 @@
             tbody.innerHTML = '';
             
             if (history.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: hsl(var(--text-muted)); padding: 24px;">Henüz hiç para çekilmemiş.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: hsl(var(--text-muted)); padding: 24px;">Henüz hiç işlem bulunmuyor.</td></tr>';
                 return;
             }
 
             history.forEach(item => {
                 const [y, m, d] = item.date.split('-');
+                const isIncome = item.type === 'income';
+                const sign = isIncome ? '+' : '-';
+                const color = isIncome ? 'hsl(var(--success))' : 'hsl(var(--danger))';
+                const typeLabel = isIncome ? 'Giriş' : 'Çıkış';
+                
+                const itemData = encodeURIComponent(JSON.stringify(item));
+                
                 const html = `
                     <tr>
                         <td style="padding: 12px 18px; font-weight: 600; color: hsl(var(--text-primary));">${d}.${m}.${y}</td>
@@ -3734,12 +3753,16 @@
                                 ${escapeHtml(item.accountName)}
                             </span>
                         </td>
-                        <td style="padding: 12px 18px; color: hsl(var(--text-secondary)); font-size: 13px;">${escapeHtml(item.notes || '-')}</td>
-                        <td style="padding: 12px 18px; text-align: right; font-weight: 800; color: hsl(var(--danger));">
-                            -${formatCurrency(item.amount, item.currency)}
+                        <td style="padding: 12px 18px; font-size: 12px; font-weight: 600; color: ${color};">${typeLabel}</td>
+                        <td style="padding: 12px 18px; color: hsl(var(--text-secondary)); font-size: 13px;">${escapeHtml(item.description || item.clientName || '-')}</td>
+                        <td style="padding: 12px 18px; text-align: right; font-weight: 800; color: ${color};">
+                            ${sign}${formatCurrency(item.amount, item.currency)}
                         </td>
-                        <td style="padding: 12px 18px; text-align: center;">
-                            <button class="icon-btn" style="color: hsl(var(--danger)); opacity: 0.6;" onclick="deleteKasaWithdraw(${item.id})" title="Sil">
+                        <td style="padding: 12px 18px; text-align: right;">
+                            <button class="icon-btn" style="color: hsl(var(--primary)); opacity: 0.7; margin-right: 4px;" onclick="editKasaTransaction('${itemData}')" title="Düzenle">
+                                <i data-lucide="edit-2" style="width:16px;height:16px;"></i>
+                            </button>
+                            <button class="icon-btn" style="color: hsl(var(--danger)); opacity: 0.7;" onclick="deleteKasaTransaction(${item.id})" title="Sil">
                                 <i data-lucide="trash-2" style="width:16px;height:16px;"></i>
                             </button>
                         </td>
@@ -3750,42 +3773,67 @@
             lucide.createIcons();
         }
 
-        window.openKasaWithdrawModal = function(accountName) {
-            document.getElementById('kwAccountName').value = accountName;
-            document.getElementById('kwAccountDisplay').value = accountName;
-            document.getElementById('kwAmount').value = '';
-            document.getElementById('kwDate').value = new Date().toISOString().split('T')[0];
-            document.getElementById('kwNotes').value = '';
+        window.openKasaTransactionModal = function(accountName, defaultType = 'expense') {
+            document.getElementById('ktId').value = '';
+            document.getElementById('ktAccountName').value = accountName;
+            document.getElementById('ktAccountDisplay').value = accountName;
+            document.getElementById('ktType').value = defaultType;
+            document.getElementById('ktAmount').value = '';
+            document.getElementById('ktDate').value = new Date().toISOString().split('T')[0];
+            document.getElementById('ktNotes').value = '';
+            document.getElementById('ktType').disabled = false; // Can change type when creating
             
-            document.getElementById('kasaWithdrawModal').classList.add('show');
+            document.getElementById('kasaTransactionModal').classList.add('show');
         };
 
-        window.closeKasaWithdrawModal = function() {
-            document.getElementById('kasaWithdrawModal').classList.remove('show');
+        window.editKasaTransaction = function(dataStr) {
+            const item = JSON.parse(decodeURIComponent(dataStr));
+            document.getElementById('ktId').value = item.id;
+            document.getElementById('ktAccountName').value = item.accountName;
+            document.getElementById('ktAccountDisplay').value = item.accountName;
+            document.getElementById('ktType').value = item.type;
+            document.getElementById('ktAmount').value = item.amount;
+            document.getElementById('ktDate').value = item.date;
+            document.getElementById('ktNotes').value = item.description || '';
+            document.getElementById('ktType').disabled = true; // Cannot change type when editing
+            
+            document.getElementById('kasaTransactionModal').classList.add('show');
         };
 
-        window.submitKasaWithdraw = async function(e) {
+        window.closeKasaTransactionModal = function() {
+            document.getElementById('kasaTransactionModal').classList.remove('show');
+        };
+
+        window.submitKasaTransaction = async function(e) {
             e.preventDefault();
-            const btn = document.getElementById('kwSaveBtn');
+            const btn = document.getElementById('ktSaveBtn');
             const orig = btn.innerHTML;
             btn.innerHTML = '...';
             btn.disabled = true;
 
+            const id = document.getElementById('ktId').value;
+            const apiEndpoint = id ? 'vault_transaction_update' : 'vault_transaction_create';
+
+            const payload = {
+                account_name: document.getElementById('ktAccountName').value,
+                type: document.getElementById('ktType').value,
+                amount: document.getElementById('ktAmount').value,
+                date: document.getElementById('ktDate').value,
+                description: document.getElementById('ktNotes').value
+            };
+            
+            if (id) payload.id = id;
+
             try {
-                const res = await fetch('/api/legacy?api=vault_withdraw', {
+                const res = await fetch('/api/legacy?api=' + apiEndpoint, {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({
-                        account_name: document.getElementById('kwAccountName').value,
-                        amount: document.getElementById('kwAmount').value,
-                        date: document.getElementById('kwDate').value,
-                        notes: document.getElementById('kwNotes').value
-                    })
+                    body: JSON.stringify(payload)
                 });
                 const result = await res.json();
                 if (result.success) {
-                    showToast('Para çekme işlemi kaydedildi.', 'success');
-                    closeKasaWithdrawModal();
+                    showToast('İşlem kaydedildi.', 'success');
+                    closeKasaTransactionModal();
                     loadKasa();
                 } else {
                     showToast('Hata: ' + result.error, 'danger');
@@ -3798,17 +3846,17 @@
             }
         };
 
-        window.deleteKasaWithdraw = async function(id) {
-            if (!confirm('Bu para çekme işlemini silmek istediğinize emin misiniz?')) return;
+        window.deleteKasaTransaction = async function(id) {
+            if (!confirm('Bu işlemi tamamen silmek istediğinize emin misiniz?')) return;
             try {
-                const res = await fetch('/api/legacy?api=vault_withdraw_delete', {
+                const res = await fetch('/api/legacy?api=vault_transaction_delete', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({ id })
                 });
                 const result = await res.json();
                 if (result.success) {
-                    showToast('Çekim işlemi silindi.', 'success');
+                    showToast('İşlem silindi.', 'success');
                     loadKasa();
                 } else {
                     showToast('Hata: ' + result.error, 'danger');

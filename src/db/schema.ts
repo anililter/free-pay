@@ -39,12 +39,15 @@ export const settings = sqliteTable('settings', {
   value: text('value'),
 });
 
-export const withdrawals = sqliteTable('withdrawals', {
+export const vaultTransactions = sqliteTable('vault_transactions', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   accountName: text('account_name').notNull(),
+  type: text('type').notNull(), // 'income', 'expense', 'adjustment'
   amount: real('amount').notNull(),
   currency: text('currency').notNull().default('TRY'),
   date: text('date').notNull(),
-  notes: text('notes'),
+  description: text('description'),
+  clientName: text('client_name'),
+  paymentId: integer('payment_id'), // optional link to a specific payment
   createdAt: text('created_at').notNull().$defaultFn(() => new Date().toISOString()),
 });

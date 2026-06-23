@@ -488,8 +488,7 @@ export async function GET(req: NextRequest) {
     // vault_stats
     // -----------------------------------------------------------------------
     if (api === 'vault_stats') {
-      const allPayments = await db.select().from(payments);
-      const allWithdrawals = await db.select().from(withdrawals).orderBy(desc(withdrawals.createdAt));
+      const allTx = await db.select().from(vaultTransactions).orderBy(desc(vaultTransactions.date), desc(vaultTransactions.id));
 
       const accountMap = new Map<string, {
         name: string;
@@ -499,29 +498,24 @@ export async function GET(req: NextRequest) {
         currency: string;
       }>();
 
-      for (const p of allPayments) {
-        if (p.status !== 'paid' || !p.accountInfo || p.accountInfo.trim() === '') continue;
-        const acc = p.accountInfo.trim();
+      for (const t of allTx) {
+        const acc = t.accountName.trim();
         if (!accountMap.has(acc)) {
-          accountMap.set(acc, { name: acc, income: 0, withdrawn: 0, balance: 0, currency: p.currency || 'TRY' });
+          accountMap.set(acc, { name: acc, income: 0, withdrawn: 0, balance: 0, currency: t.currency || 'TRY' });
         }
-        accountMap.get(acc)!.income += p.amount;
-        accountMap.get(acc)!.balance += p.amount;
-      }
-
-      for (const w of allWithdrawals) {
-        const acc = w.accountName.trim();
-        if (!accountMap.has(acc)) {
-          accountMap.set(acc, { name: acc, income: 0, withdrawn: 0, balance: 0, currency: w.currency || 'TRY' });
+        if (t.type === 'income') {
+          accountMap.get(acc)!.income += t.amount;
+          accountMap.get(acc)!.balance += t.amount;
+        } else if (t.type === 'expense') {
+          accountMap.get(acc)!.withdrawn += t.amount;
+          accountMap.get(acc)!.balance -= t.amount;
         }
-        accountMap.get(acc)!.withdrawn += w.amount;
-        accountMap.get(acc)!.balance -= w.amount;
       }
 
       return ok({
         data: {
           accounts: Array.from(accountMap.values()),
-          history: allWithdrawals
+          history: allTx
         }
       });
     }
@@ -738,6 +732,32 @@ export async function POST(req: NextRequest) {
 
       if (Object.keys(updates).length > 0) {
         await db.update(payments).set(updates).where(eq(payments.id, paymentId));
+
+        // Sync with vault_transactions
+        const [updatedPayment] = await db.select().from(payments).where(eq(payments.id, paymentId));
+        if (updatedPayment.status === 'paid' && updatedPayment.accountInfo) {
+          const existingTx = await db.select().from(vaultTransactions).where(eq(vaultTransactions.paymentId, paymentId));
+          if (existingTx.length === 0) {
+            await db.insert(vaultTransactions).values({
+              accountName: updatedPayment.accountInfo,
+              type: 'income',
+              amount: updatedPayment.amount || 0,
+              currency: updatedPayment.currency || 'TRY',
+              date: updatedPayment.paidDate || new Date().toISOString().split('T')[0],
+              description: `Tahsilat: ${client?.name || ''}`,
+              clientName: client?.name || null,
+              paymentId: paymentId
+            });
+          } else {
+            await db.update(vaultTransactions).set({
+              amount: updatedPayment.amount || 0,
+              date: updatedPayment.paidDate || new Date().toISOString().split('T')[0],
+              accountName: updatedPayment.accountInfo
+            }).where(eq(vaultTransactions.paymentId, paymentId));
+          }
+        } else if (updatedPayment.status !== 'paid') {
+          await db.delete(vaultTransactions).where(eq(vaultTransactions.paymentId, paymentId));
+        }
       }
 
       return ok({ message: 'Payment updated' });
@@ -848,34 +868,56 @@ export async function POST(req: NextRequest) {
     }
 
     // -----------------------------------------------------------------------
-    // vault_withdraw
+    // vault_transaction_create
     // -----------------------------------------------------------------------
-    if (api === 'vault_withdraw') {
-      const { account_name, amount, currency, date, notes } = body;
-      if (!account_name || !amount || !date) {
+    if (api === 'vault_transaction_create') {
+      const { account_name, type, amount, currency, date, description, client_name } = body;
+      if (!account_name || !type || !amount || !date) {
         return fail('Missing required fields');
       }
 
-      await db.insert(withdrawals).values({
+      await db.insert(vaultTransactions).values({
         accountName: account_name,
+        type,
         amount: parseFloat(amount),
         currency: currency || 'TRY',
         date,
-        notes: notes || null
+        description: description || null,
+        clientName: client_name || null
       });
 
-      return ok({ message: 'Withdrawal created' });
+      return ok({ message: 'Transaction created' });
     }
 
     // -----------------------------------------------------------------------
-    // vault_withdraw_delete
+    // vault_transaction_update
     // -----------------------------------------------------------------------
-    if (api === 'vault_withdraw_delete') {
+    if (api === 'vault_transaction_update') {
+      const id = parseInt(body.id, 10);
+      if (!id) return fail('Missing id');
+      
+      const { amount, date, description } = body;
+      const updates: Record<string, unknown> = {};
+      if (amount !== undefined) updates.amount = parseFloat(amount);
+      if (date !== undefined) updates.date = date;
+      if (description !== undefined) updates.description = description;
+
+      if (Object.keys(updates).length > 0) {
+        await db.update(vaultTransactions).set(updates).where(eq(vaultTransactions.id, id));
+      }
+
+      return ok({ message: 'Transaction updated' });
+    }
+
+    // -----------------------------------------------------------------------
+    // vault_transaction_delete
+    // -----------------------------------------------------------------------
+    if (api === 'vault_transaction_delete') {
       const id = parseInt(body.id, 10);
       if (!id) return fail('Missing id');
 
-      await db.delete(withdrawals).where(eq(withdrawals.id, id));
-      return ok({ message: 'Withdrawal deleted' });
+      await db.delete(vaultTransactions).where(eq(vaultTransactions.id, id));
+      return ok({ message: 'Transaction deleted' });
     }
 
     return fail('Unknown API endpoint');
