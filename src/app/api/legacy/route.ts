@@ -920,6 +920,40 @@ export async function POST(req: NextRequest) {
       return ok({ message: 'Transaction deleted' });
     }
 
+    // -----------------------------------------------------------------------
+    // vault_balance_adjust
+    // -----------------------------------------------------------------------
+    if (api === 'vault_balance_adjust') {
+      const { account_name, target_balance } = body;
+      if (!account_name || target_balance === undefined) {
+        return fail('Missing account_name or target_balance');
+      }
+
+      // Calculate current balance
+      const allTx = await db.select().from(vaultTransactions).where(eq(vaultTransactions.accountName, account_name));
+      let currentBalance = 0;
+      let currency = 'TRY';
+      for (const t of allTx) {
+        if (t.type === 'income') currentBalance += t.amount;
+        else if (t.type === 'expense') currentBalance -= t.amount;
+        currency = t.currency; // use last known currency
+      }
+
+      const diff = parseFloat(target_balance) - currentBalance;
+      if (Math.abs(diff) > 0.001) {
+        await db.insert(vaultTransactions).values({
+          accountName: account_name,
+          type: diff > 0 ? 'income' : 'expense',
+          amount: Math.abs(diff),
+          currency,
+          date: new Date().toISOString().split('T')[0],
+          description: 'Manuel Bakiye Eşitleme (Sistem)',
+        });
+      }
+
+      return ok({ message: 'Balance adjusted' });
+    }
+
     return fail('Unknown API endpoint');
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Internal server error';
