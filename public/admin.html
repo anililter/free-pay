@@ -1137,11 +1137,11 @@
             </div>
         </div>
 
-        <!-- ================= TAB KASA: VAULT & ACCOUNTS ================= -->
         <div id="tabViewKasa" class="tab-content">
             <div class="panel">
                 <div class="panel-header" style="justify-content: space-between;">
                     <h2>Kasa & Hesap Bakiyeleri</h2>
+                    <button class="btn btn-primary" onclick="openKasaTransactionModal('', 'income')">+ Yeni İşlem / Hesap Ekle</button>
                 </div>
                 <!-- Kasa Accounts Grid -->
                 <div id="kasaGrid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-top: 16px;">
@@ -1456,11 +1456,9 @@
             </div>
             <div class="modal-body">
                 <form id="ktForm" onsubmit="submitKasaTransaction(event)">
-                    <input type="hidden" id="ktId">
-                    <input type="hidden" id="ktAccountName">
                     <div class="form-group">
                         <label class="form-label">Hesap Adı</label>
-                        <input type="text" id="ktAccountDisplay" class="form-input" disabled>
+                        <input type="text" id="ktAccountName" class="form-input" placeholder="Örn: Sevcan Sarı, Merkez Kasa vb." required>
                     </div>
                     <div class="form-group">
                         <label class="form-label">İşlem Yönü</label>
@@ -3690,7 +3688,7 @@
             grid.innerHTML = '';
             
             if (accounts.length === 0) {
-                grid.innerHTML = '<div style="color: hsl(var(--text-muted));">Henüz tahsilat yapılmış bir hesap bulunmuyor.</div>';
+                grid.innerHTML = '<div style="padding: 40px; text-align: center; background: #f9f9f9; border-radius: 12px; border: 2px dashed #ddd; color: #888;">Henüz tanımlı kasa hesabı bulunmuyor. Yeni bir işlem ekleyerek başlayın.</div>';
                 return;
             }
 
@@ -3780,15 +3778,16 @@
             lucide.createIcons();
         }
 
-        window.openKasaTransactionModal = function(accountName, defaultType = 'expense') {
+        window.openKasaTransactionModal = function(accountName = '', defaultType = 'expense') {
             document.getElementById('ktId').value = '';
             document.getElementById('ktAccountName').value = accountName;
-            document.getElementById('ktAccountDisplay').value = accountName;
             document.getElementById('ktType').value = defaultType;
             document.getElementById('ktAmount').value = '';
             document.getElementById('ktDate').value = new Date().toISOString().split('T')[0];
             document.getElementById('ktNotes').value = '';
             document.getElementById('ktType').disabled = false;
+            document.getElementById('ktAccountName').disabled = (accountName !== '');
+
             
             // Populate clients dropdown
             const clientSelect = document.getElementById('ktClientName');
@@ -3805,12 +3804,12 @@
             const item = JSON.parse(decodeURIComponent(dataStr));
             document.getElementById('ktId').value = item.id;
             document.getElementById('ktAccountName').value = item.accountName;
-            document.getElementById('ktAccountDisplay').value = item.accountName;
             document.getElementById('ktType').value = item.type;
             document.getElementById('ktAmount').value = item.amount;
             document.getElementById('ktDate').value = item.date;
             document.getElementById('ktNotes').value = item.description || '';
             document.getElementById('ktType').disabled = true;
+            document.getElementById('ktAccountName').disabled = false;
 
             const clientSelect = document.getElementById('ktClientName');
             clientSelect.innerHTML = '<option value="">-- Müşteri Yok / Manuel İşlem --</option>';
