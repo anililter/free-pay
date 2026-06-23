@@ -3792,7 +3792,7 @@
             // Populate clients dropdown
             const clientSelect = document.getElementById('ktClientName');
             clientSelect.innerHTML = '<option value="">-- Müşteri Yok / Manuel İşlem --</option>';
-            window.allClientsList.forEach(c => {
+            allClients.forEach(c => {
                 clientSelect.innerHTML += `<option value="${escapeHtml(c.name)}">${escapeHtml(c.name)}</option>`;
             });
             clientSelect.value = '';
@@ -3813,7 +3813,7 @@
 
             const clientSelect = document.getElementById('ktClientName');
             clientSelect.innerHTML = '<option value="">-- Müşteri Yok / Manuel İşlem --</option>';
-            window.allClientsList.forEach(c => {
+            allClients.forEach(c => {
                 clientSelect.innerHTML += `<option value="${escapeHtml(c.name)}">${escapeHtml(c.name)}</option>`;
             });
             clientSelect.value = item.clientName || '';
