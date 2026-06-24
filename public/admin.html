@@ -2004,8 +2004,9 @@
         function populateAccountSelects() {
             const accounts = window.paymentAccountsList || [];
             document.querySelectorAll('select.account-select').forEach(select => {
-                // Keep the first empty option if it exists (for filters/placeholders)
-                const firstOption = select.options.length > 0 && select.options[0].value === "" ? select.options[0].outerHTML : "";
+                // Keep the first option if it's an 'all' filter or empty placeholder
+                const firstOpt = select.options.length > 0 ? select.options[0] : null;
+                const firstOption = firstOpt && (firstOpt.value === "" || firstOpt.value === "all") ? firstOpt.outerHTML : "";
                 
                 let optionsHtml = firstOption;
                 accounts.forEach(acc => {
