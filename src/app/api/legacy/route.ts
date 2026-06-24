@@ -606,6 +606,15 @@ export async function GET(req: NextRequest) {
         currency: string;
       }>();
 
+      // Read explicit accounts from settings
+      const settingsData = await db.select().from(settings).where(eq(settings.key, 'payment_accounts'));
+      if (settingsData.length > 0 && settingsData[0].value) {
+        const accs = settingsData[0].value.split('\n').map(a => a.trim()).filter(Boolean);
+        for (const a of accs) {
+          accountMap.set(a, { name: a, income: 0, withdrawn: 0, balance: 0, currency: 'TRY' });
+        }
+      }
+
       for (const t of allTx) {
         const acc = t.accountName.trim();
         if (!accountMap.has(acc)) {

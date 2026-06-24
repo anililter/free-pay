@@ -1506,9 +1506,16 @@
                                 <i data-lucide="wallet" style="width:16px; height:16px;"></i> Ödeme Yerleri / Hesaplar
                             </h4>
                             <div class="form-group">
-                                <label class="form-label" for="settingsPaymentAccounts">Hesap Listesi (Her satıra bir hesap adı yazın)</label>
-                                <textarea id="settingsPaymentAccounts" class="form-control" rows="4" placeholder="Örn: Enpara&#10;Garanti Bankası&#10;Elden Nakit"></textarea>
-                                <small style="color:hsl(var(--text-muted)); font-size:11px; margin-top:4px; display:block;">Buraya yazdığınız hesaplar, müşteri ve işlem eklerken seçilebilecek hesaplar olacaktır.</small>
+                                <label class="form-label">Kayıtlı Ödeme Yerleri</label>
+                                <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+                                    <input type="text" id="newAccountInput" class="form-control" placeholder="Örn: Garanti Bankası">
+                                    <button type="button" class="btn btn-primary" onclick="addPaymentAccount()" style="white-space: nowrap;"><i data-lucide="plus" style="width:16px;height:16px;"></i> Ekle</button>
+                                </div>
+                                <div id="settingsAccountsList" style="display: flex; flex-direction: column; gap: 8px; max-height: 200px; overflow-y: auto; padding-right: 8px;">
+                                    <!-- Accounts will be listed here -->
+                                </div>
+                                <input type="hidden" id="settingsPaymentAccounts">
+                                <small style="color:hsl(var(--text-muted)); font-size:11px; margin-top:8px; display:block;">Buraya eklediğiniz hesaplar kasada ve dropdown listelerinde görünecektir. Değişiklikleri uygulamak için "Tüm Ayarları Kaydet" butonuna tıklamayı unutmayın.</small>
                             </div>
                         </div>
 
@@ -2004,7 +2011,14 @@
         const MONTHS_SHORT = ['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'];
         
         function populateAccountSelects() {
-            const accounts = window.paymentAccountsList || [];
+            let accounts = window.paymentAccountsList ? [...window.paymentAccountsList] : [];
+            if (window.vaultHistoryData) {
+                window.vaultHistoryData.forEach(tx => {
+                    if (tx.accountName && !accounts.includes(tx.accountName)) {
+                        accounts.push(tx.accountName);
+                    }
+                });
+            }
             document.querySelectorAll('select.account-select').forEach(select => {
                 // Keep the first option if it's an 'all' filter or empty placeholder
                 const firstOpt = select.options.length > 0 ? select.options[0] : null;
@@ -2062,6 +2076,7 @@
             selectedPeriod = endPeriod;
 
             loadAllData();
+            loadKasa();
             
             document.getElementById('searchClient').addEventListener('input', renderTable);
         });
@@ -2257,6 +2272,7 @@
         // Fetch data
         async function loadAllData() {
             try {
+                await loadSettings(); // ensure settings are loaded first
                 const response = await fetch('/api/legacy?api=clients_list');
                 const result = await response.json();
                 if (result.success) {
@@ -2957,12 +2973,81 @@
                     document.getElementById('settingsGeminiApiKey').value = settingsData.gemini_api_key || '';
                     document.getElementById('settingsPaymentAccounts').value = settingsData.payment_accounts || '';
                     window.paymentAccountsList = (settingsData.payment_accounts || '').split('\n').map(a => a.trim()).filter(Boolean);
+                    renderSettingsAccountsList();
                     populateAccountSelects();
                 }
             } catch (err) {
                 console.error(err);
                 showToast('Ayarlar yüklenemedi.', 'danger');
             }
+        };
+
+        function renderSettingsAccountsList() {
+            const listDiv = document.getElementById('settingsAccountsList');
+            const hiddenInput = document.getElementById('settingsPaymentAccounts');
+            const accounts = window.paymentAccountsList || [];
+            
+            // Sync to hidden input
+            hiddenInput.value = accounts.join('\n');
+            
+            listDiv.innerHTML = '';
+            if (accounts.length === 0) {
+                listDiv.innerHTML = '<div style="color:hsl(var(--text-muted)); font-size:13px; text-align:center; padding: 12px; background:hsla(0,0%,50%,0.05); border-radius:6px;">Hiç hesap eklenmedi.</div>';
+                return;
+            }
+            
+            accounts.forEach((acc, index) => {
+                const itemHtml = `
+                    <div style="display:flex; justify-content:space-between; align-items:center; background:white; padding: 10px 14px; border-radius: 6px; border: 1px solid hsl(var(--border-color));">
+                        <span style="font-weight:600; font-size:13px; color:hsl(var(--text-primary));">${escapeHtml(acc)}</span>
+                        <button type="button" class="icon-btn delete" onclick="removePaymentAccount(${index})" title="Sil" style="background:none; border:none; color:hsl(var(--danger)); cursor:pointer; padding:4px;">
+                            <i data-lucide="trash-2" style="width:16px;height:16px;"></i>
+                        </button>
+                    </div>
+                `;
+                listDiv.insertAdjacentHTML('beforeend', itemHtml);
+            });
+            lucide.createIcons();
+        }
+
+        window.addPaymentAccount = async function() {
+            const input = document.getElementById('newAccountInput');
+            const val = input.value.trim();
+            if (!val) return;
+            
+            if (!window.paymentAccountsList) window.paymentAccountsList = [];
+            if (window.paymentAccountsList.includes(val)) {
+                showToast('Bu hesap zaten ekli!', 'warning');
+                return;
+            }
+            
+            window.paymentAccountsList.push(val);
+            input.value = '';
+            renderSettingsAccountsList();
+            
+            // Auto save
+            await fetch('/api/legacy?api=settings_save', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ payment_accounts: document.getElementById('settingsPaymentAccounts').value })
+            });
+            showToast('Hesap eklendi ve kaydedildi.', 'success');
+            loadKasa(); // refresh kasa accounts
+        };
+
+        window.removePaymentAccount = async function(index) {
+            if (!confirm('Bu hesabı listeden çıkarmak istediğinize emin misiniz? (Geçmiş işlemleri etkilemez)')) return;
+            window.paymentAccountsList.splice(index, 1);
+            renderSettingsAccountsList();
+            
+            // Auto save
+            await fetch('/api/legacy?api=settings_save', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ payment_accounts: document.getElementById('settingsPaymentAccounts').value })
+            });
+            showToast('Hesap silindi ve kaydedildi.', 'success');
+            loadKasa(); // refresh kasa accounts
         };
 
         window.saveSettingsForm = async function(e) {
@@ -4302,6 +4387,8 @@
             }
         };
 
+
+        // Note: loadAllData() and loadKasa() are called via DOMContentLoaded event
 
         // Helper to show notifications
         function showToast(message, type = 'success') {
