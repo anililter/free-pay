@@ -1338,7 +1338,8 @@
             </div>
         </div>
 
-        <div id="tabViewKasa" class="tab-content" style="display: flex; flex-direction: column; gap: 24px;">
+        <div id="tabViewKasa" class="tab-content">
+            <div style="display: flex; flex-direction: column; gap: 24px;">
             <div class="panel">
                 <div class="panel-header" style="justify-content: space-between; align-items: flex-end;">
                     <div>
@@ -1400,6 +1401,7 @@
                     </table>
                 </div>
             </div>
+        </div>
         </div>
 
         <!-- ================= TAB 3: CLIENTS & AGREEMENTS VIEW ================= -->
@@ -2015,11 +2017,16 @@
                     }
                 });
                 
-                // If it's the inline table editor, preserve its current value
-                const currentValue = select.getAttribute('data-current-value');
+                // Preserve current value
+                const currentVal = select.value;
+                const dataVal = select.getAttribute('data-current-value');
+                
                 select.innerHTML = optionsHtml;
-                if (currentValue) {
-                    select.value = currentValue;
+                
+                if (dataVal) {
+                    select.value = dataVal;
+                } else if (currentVal) {
+                    select.value = currentVal;
                 }
             });
         }
@@ -2722,6 +2729,40 @@
                 saveInline(clientId, period, field, value);
             } else {
                 saveInlineNoRender(clientId, period, field, value, inputElement);
+            }
+        };
+
+        window.onClientAccountEdit = async function(clientId, selectElement) {
+            const value = selectElement.value;
+            const c = allClients.find(item => item.id == clientId);
+            if (!c) return;
+
+            c.account_info = value;
+            
+            // Highlight element to show it's saving
+            selectElement.style.border = '1px solid hsl(var(--primary))';
+            
+            try {
+                const response = await fetch('/api/legacy?api=client_update', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        id: c.id,
+                        account_info: c.account_info
+                    })
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    selectElement.style.border = '1px solid #10b981'; // green for success
+                    setTimeout(() => { selectElement.style.border = '1px solid hsl(var(--border-color))'; }, 2000);
+                } else {
+                    selectElement.style.border = '1px solid #ef4444'; // red for error
+                    showToast('Güncelleme hatası: ' + result.error, 'danger');
+                }
+            } catch (err) {
+                console.error(err);
+                selectElement.style.border = '1px solid #ef4444';
             }
         };
 
@@ -3571,7 +3612,9 @@
                             <div style="font-weight:600; color:hsl(var(--text-secondary));">${termBadge}</div>
                         </td>
                         <td>
-                            <span class="account-badge" style="padding: 4px 8px; border-radius: 4px; background: hsl(var(--bg-base)); border: 1px solid hsl(var(--border-color)); font-size:11px; font-weight:700;">${escapeHtml(c.account_info)}</span>
+                            <select class="table-input account-select" data-current-value="${escapeHtml(c.account_info || '')}"
+                                    onchange="onClientAccountEdit(${c.id}, this)"
+                                    style="width: 120px; font-size: 11px; font-weight: 700; padding: 4px 8px; border-radius: 4px; background: hsl(var(--bg-base)); border: 1px solid hsl(var(--border-color));"></select>
                         </td>
                         <td>
                             <div style="font-weight:600; color:hsl(var(--text-secondary));">${c.start_date || '-'}</div>
@@ -3594,6 +3637,7 @@
                 tbody.insertAdjacentHTML('beforeend', rowHtml);
             });
             lucide.createIcons();
+            populateAccountSelects();
         };
 
         window.openManualPaymentModal = function() {
