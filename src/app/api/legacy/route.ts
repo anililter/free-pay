@@ -530,8 +530,11 @@ export async function GET(req: NextRequest) {
     // telegram_get_chat_id
     // -----------------------------------------------------------------------
     if (api === 'telegram_get_chat_id') {
-      const rows = await db.select().from(settings).where(eq(settings.key, 'telegram_bot_token'));
-      const token = rows.length > 0 ? rows[0].value : null;
+      let token = searchParams.get('token');
+      if (!token) {
+        const rows = await db.select().from(settings).where(eq(settings.key, 'telegram_bot_token'));
+        token = rows.length > 0 ? rows[0].value : null;
+      }
 
       if (!token) {
         return fail('Telegram Bot Token bulunamadı. Lütfen önce kaydedin.');
