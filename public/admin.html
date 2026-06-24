@@ -3985,25 +3985,27 @@
                 
                 const html = `
                     <tr>
-                        <td style="padding: 12px 18px; font-weight: 600; color: hsl(var(--text-primary)); text-align: center;">${d}.${m}.${y}</td>
-                        <td style="padding: 12px 18px; text-align: center;">
-                            <span style="background: hsla(var(--primary-rgb), 0.1); color: hsl(var(--primary)); padding: 4px 8px; border-radius: 6px; font-size: 12px; font-weight: 700;">
+                        <td style="padding: 10px 14px; font-weight: 600; color: hsl(var(--text-primary)); text-align: center; white-space: nowrap;">${d}.${m}.${y}</td>
+                        <td style="padding: 10px 14px; text-align: center;">
+                            <span style="background: hsla(var(--primary-rgb), 0.1); color: hsl(var(--primary)); padding: 3px 8px; border-radius: 6px; font-size: 12px; font-weight: 700; white-space: nowrap;">
                                 ${escapeHtml(item.accountName)}
                             </span>
                         </td>
-                        <td style="padding: 12px 18px; font-size: 12px; font-weight: 600; color: ${color}; text-align: center;">${typeLabel}</td>
-                        <td style="padding: 12px 18px; color: hsl(var(--text-secondary)); font-size: 13px; text-align: center;">${escapeHtml(item.description || item.clientName || '-')}</td>
-                        <td style="padding: 12px 18px; text-align: center; font-weight: 800; color: ${color};">
+                        <td style="padding: 10px 14px; font-size: 12px; font-weight: 600; color: ${color}; text-align: center;">${typeLabel}</td>
+                        <td style="padding: 10px 14px; color: hsl(var(--text-secondary)); font-size: 13px; text-align: center;">${escapeHtml(item.description || item.clientName || '-')}</td>
+                        <td style="padding: 10px 14px; text-align: right; font-weight: 800; color: ${color}; white-space: nowrap;">
                             ${sign}${formatCurrency(item.amount, item.currency)}
                         </td>
-                        <td style="padding: 12px 18px; text-align: center;">
-                            ${item.attachmentUrl ? `<button class="icon-btn" style="color: hsl(var(--primary)); margin-right: 4px;" onclick="viewInvoiceImage('${item.attachmentUrl}')" title="Faturayı Gör"><i data-lucide="image" style="width:16px;height:16px;"></i></button>` : ''}
-                            <button class="icon-btn" style="color: hsl(var(--primary)); opacity: 0.7; margin-right: 4px;" onclick="editKasaTransaction('${itemData}')" title="Düzenle">
-                                <i data-lucide="edit-2" style="width:16px;height:16px;"></i>
-                            </button>
-                            <button class="icon-btn" style="color: hsl(var(--danger)); opacity: 0.7;" onclick="deleteKasaTransaction(${item.id})" title="Sil">
-                                <i data-lucide="trash-2" style="width:16px;height:16px;"></i>
-                            </button>
+                        <td style="padding: 10px 14px;">
+                            <div style="display: flex; align-items: center; justify-content: flex-end; gap: 2px;">
+                                ${item.attachmentUrl ? `<button class="icon-btn" style="color: hsl(var(--primary));" onclick="viewInvoiceImage('${item.attachmentUrl}')" title="Faturayı Gör"><i data-lucide="image" style="width:15px;height:15px;"></i></button>` : ''}
+                                <button class="icon-btn edit" onclick="editKasaTransaction('${itemData}')" title="Düzenle">
+                                    <i data-lucide="edit-2" style="width:15px;height:15px;"></i>
+                                </button>
+                                <button class="icon-btn delete" onclick="deleteKasaTransaction(${item.id})" title="Sil">
+                                    <i data-lucide="trash-2" style="width:15px;height:15px;"></i>
+                                </button>
+                            </div>
                         </td>
                     </tr>
                 `;
