@@ -677,15 +677,6 @@
             color: hsl(var(--text-primary));
         }
 
-        .panel > .table-container {
-            border: none;
-            border-radius: 0;
-            box-shadow: none;
-            margin-bottom: 0;
-            margin-left: -24px;
-            margin-right: -24px;
-            width: calc(100% + 48px);
-        }
 
         /* Brand list page style */
         .brands-grid {
@@ -1190,7 +1181,7 @@
                         <option value="paid">Sadece Ödenenler</option>
                     </select>
 
-                    <select id="filterAccount" class="form-control" onchange="renderTable()">
+                    <select id="filterAccount" class="form-control account-select" onchange="renderTable()">
                         <option value="all">Tüm Ödeme Yerleri</option>
                         <!-- Seçenekler JavaScript tarafından dinamik olarak doldurulur -->
                     </select>
@@ -1367,12 +1358,32 @@
 
 
             <div class="panel">
-                <div class="panel-header" style="justify-content: space-between;">
-                    <h2>Hesap İşlem Geçmişi (Ledger)</h2>
-                    <button id="btnResetVaultFilter" class="btn btn-outline" style="display: none; padding: 6px 12px; font-size: 13px;" onclick="resetVaultFilter()">Tüm İşlemleri Göster</button>
+                <div class="panel-header" style="flex-direction: column; align-items: flex-start; gap: 16px;">
+                    <div style="display: flex; justify-content: space-between; width: 100%; align-items: center;">
+                        <h2>Hesap İşlem Geçmişi</h2>
+                        <button id="btnResetVaultFilter" class="btn btn-outline" style="display: none; padding: 6px 12px; font-size: 13px;" onclick="resetVaultFilter()">Tüm İşlemleri Göster</button>
+                    </div>
+                    
+                    <div class="toolbar" style="width: 100%; margin-bottom: 0;">
+                        <div class="filter-group">
+                            <input type="date" id="filterKasaDate" class="form-control" onchange="renderKasaHistory()" title="Tarih Filtresi">
+                            <select id="filterKasaAccount" class="form-control account-select" onchange="renderKasaHistory()">
+                                <option value="">Tüm Hesaplar</option>
+                            </select>
+                            <select id="filterKasaType" class="form-control" onchange="renderKasaHistory()">
+                                <option value="">Tüm İşlem Tipleri</option>
+                                <option value="income">Giriş</option>
+                                <option value="expense">Çıkış</option>
+                            </select>
+                            <div class="search-wrapper">
+                                <i data-lucide="search" class="search-icon"></i>
+                                <input type="number" id="filterKasaAmount" class="form-control" placeholder="Tutar..." oninput="renderKasaHistory()" style="padding-left: 36px;">
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <div class="table-container">
-                    <table>
+                <div class="table-container" style="margin: 0; border-radius: 0 0 var(--radius-lg) var(--radius-lg); border: none; box-shadow: none;">
+                    <table style="width: 100%; border-collapse: collapse; table-layout: auto;">
                         <thead>
                             <tr>
                                 <th style="text-align: center;">Tarih</th>
@@ -1486,6 +1497,19 @@
                                 </div>
                             </div>
                         </div>
+                        
+                        <!-- Hesap Ayarları -->
+                        <div style="background: hsla(var(--primary-rgb), 0.05); padding: 16px; border-radius: 8px; border: 1px solid hsla(var(--primary-rgb), 0.2);">
+                            <h4 style="font-weight: 700; color: hsl(var(--text-primary)); margin-bottom: 12px; display: flex; align-items: center; gap: 6px;">
+                                <i data-lucide="wallet" style="width:16px; height:16px;"></i> Ödeme Yerleri / Hesaplar
+                            </h4>
+                            <div class="form-group">
+                                <label class="form-label" for="settingsPaymentAccounts">Hesap Listesi (Her satıra bir hesap adı yazın)</label>
+                                <textarea id="settingsPaymentAccounts" class="form-control" rows="4" placeholder="Örn: Enpara&#10;Garanti Bankası&#10;Elden Nakit"></textarea>
+                                <small style="color:hsl(var(--text-muted)); font-size:11px; margin-top:4px; display:block;">Buraya yazdığınız hesaplar, müşteri ve işlem eklerken seçilebilecek hesaplar olacaktır.</small>
+                            </div>
+                        </div>
+
                         <div class="settings-row" style="display:grid; grid-template-columns: 1fr 1fr; gap: 16px;">
                             <div class="form-group">
                                 <label class="form-label" for="settingsSmtpHost">SMTP Sunucu (Host)</label>
@@ -1661,7 +1685,9 @@
                     <input type="hidden" id="ktId">
                     <div class="form-group">
                         <label class="form-label">Hesap Adı</label>
-                        <input type="text" id="ktAccountName" class="form-input" placeholder="Örn: Sevcan Sarı, Merkez Kasa vb." required>
+                        <select id="ktAccountName" class="form-control account-select" required>
+                            <option value="">Seçiniz...</option>
+                        </select>
                     </div>
                     <div class="form-group">
                         <label class="form-label">İşlem Yönü</label>
@@ -1889,7 +1915,9 @@
 
                     <div class="form-group full-width">
                         <label class="form-label" for="fieldAccountInfo">Ödeme Yapılacak Yer / Hesap *</label>
-                        <input type="text" id="fieldAccountInfo" list="accountDatalist" class="form-control" placeholder="Örn. Şahsi iban" required>
+                        <select id="fieldAccountInfo" class="form-control account-select" required>
+                            <option value="">Seçiniz...</option>
+                        </select>
                     </div>
 
                     <div class="form-group">
@@ -1930,7 +1958,7 @@
         <div class="toast-content" id="toastMessage">İşlem başarıyla tamamlandı.</div>
     </div>
 
-    <datalist id="accountDatalist"></datalist>
+
 
     <!-- Bulk Action Bar -->
     <div id="bulkActionBar" class="bulk-action-bar">
@@ -1973,8 +2001,27 @@
         const DAYS_OF_WEEK = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt'];
         const MONTHS_SHORT = ['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'];
         
-        // Ödeme yeri seçenekleri — API'den dinamik olarak yüklenir (window.accountOptions)
-        // Hard-coded liste kaldırıldı; DB'deki tüm clients.account_info ve payments.account_info değerleri kullanılır.
+        function populateAccountSelects() {
+            const accounts = window.paymentAccountsList || [];
+            document.querySelectorAll('select.account-select').forEach(select => {
+                // Keep the first empty option if it exists (for filters/placeholders)
+                const firstOption = select.options.length > 0 && select.options[0].value === "" ? select.options[0].outerHTML : "";
+                
+                let optionsHtml = firstOption;
+                accounts.forEach(acc => {
+                    if(acc.trim()) {
+                        optionsHtml += `<option value="${escapeHtml(acc.trim())}">${escapeHtml(acc.trim())}</option>`;
+                    }
+                });
+                
+                // If it's the inline table editor, preserve its current value
+                const currentValue = select.getAttribute('data-current-value');
+                select.innerHTML = optionsHtml;
+                if (currentValue) {
+                    select.value = currentValue;
+                }
+            });
+        }
 
         // App state
         let allPayments = [];
@@ -1986,60 +2033,7 @@
         let chartMonthlyInstance = null;
         let chartAccountsInstance = null;
 
-        function updateAccountDatalist() {
-            const datalist = document.getElementById('accountDatalist');
-            const filterAcc = document.getElementById('filterAccount');
-            if (!datalist) return;
-
-            // 1. Önce API'den gelen DB kayıtlı hesapları al (en güvenilir kaynak)
-            const accounts = new Set(Array.isArray(window.accountOptions) ? window.accountOptions : []);
-
-            // 2. Yüklü müşteri listesinden ekle (yeni eklenmiş olabilir)
-            if (Array.isArray(allClients)) {
-                allClients.forEach(c => {
-                    if (c.account_info && c.account_info.trim()) {
-                        accounts.add(c.account_info.trim());
-                    }
-                });
-            }
-
-            // 3. Yüklü ödemelerden ekle
-            if (Array.isArray(allPayments)) {
-                allPayments.forEach(p => {
-                    if (p.account_info && p.account_info.trim()) {
-                        accounts.add(p.account_info.trim());
-                    }
-                });
-            }
-
-            datalist.innerHTML = '';
-            accounts.forEach(acc => {
-                if (acc) {
-                    const option = document.createElement('option');
-                    option.value = acc;
-                    datalist.appendChild(option);
-                }
-            });
-
-            if (filterAcc) {
-                const currentVal = filterAcc.value;
-                filterAcc.innerHTML = '<option value="all">Tüm Ödeme Yerleri</option>';
-                accounts.forEach(acc => {
-                    if (acc) {
-                        const option = document.createElement('option');
-                        option.value = acc;
-                        option.textContent = acc;
-                        if (acc === currentVal) {
-                            option.selected = true;
-                        }
-                        filterAcc.appendChild(option);
-                    }
-                });
-                if (currentVal !== 'all' && !accounts.has(currentVal)) {
-                    filterAcc.value = 'all';
-                }
-            }
-        }
+        // updateAccountDatalist is replaced by populateAccountSelects
 
         window.addEventListener('DOMContentLoaded', () => {
             const now = new Date();
@@ -2292,7 +2286,7 @@
                     window.paidThisMonthAmount = result.paid_this_month_amount || 0;
                     window.paidLateAmount = result.paid_late_amount || 0;
 
-                    updateAccountDatalist();
+                    populateAccountSelects();
                     renderTable();
                     
                     if (currentTab === 'reports') {
@@ -2646,8 +2640,8 @@
                             `}
                         </td>
                         <td>
-                            <input type="text" class="table-input" list="accountDatalist" value="${escapeHtml(p.account_info || '')}" 
-                                   onchange="onInlineEdit(${p.client_id}, '${p.period}', 'account_info', this)">
+                            <select class="table-input account-select" data-current-value="${escapeHtml(p.account_info || '')}"
+                                    onchange="onInlineEdit(${p.client_id}, '${p.period}', 'account_info', this)"></select>
                         </td>
                         <td>
                             <div style="display:flex; align-items:center; gap:8px;">
@@ -2918,6 +2912,9 @@
                     document.getElementById('settingsTelegramBotToken').value = settingsData.telegram_bot_token || '';
                     document.getElementById('settingsTelegramChatId').value = settingsData.telegram_chat_id || '';
                     document.getElementById('settingsGeminiApiKey').value = settingsData.gemini_api_key || '';
+                    document.getElementById('settingsPaymentAccounts').value = settingsData.payment_accounts || '';
+                    window.paymentAccountsList = (settingsData.payment_accounts || '').split('\n').map(a => a.trim()).filter(Boolean);
+                    populateAccountSelects();
                 }
             } catch (err) {
                 console.error(err);
@@ -2936,7 +2933,8 @@
                 smtp_pass: document.getElementById('settingsSmtpPass').value,
                 telegram_bot_token: document.getElementById('settingsTelegramBotToken').value,
                 telegram_chat_id: document.getElementById('settingsTelegramChatId').value,
-                gemini_api_key: document.getElementById('settingsGeminiApiKey').value
+                gemini_api_key: document.getElementById('settingsGeminiApiKey').value,
+                payment_accounts: document.getElementById('settingsPaymentAccounts').value
             };
 
             try {
@@ -2947,6 +2945,8 @@
                 });
                 const result = await response.json();
                 if (result.success) {
+                    window.paymentAccountsList = config.payment_accounts.split('\n').map(a => a.trim()).filter(Boolean);
+                    populateAccountSelects();
                     showToast('Ayarlar başarıyla kaydedildi.', 'success');
                 } else {
                     showToast('Hata: ' + result.error, 'danger');
@@ -4007,16 +4007,29 @@
             lucide.createIcons();
         }
 
-        function renderKasaHistory(history) {
+        function renderKasaHistory(historyParam) {
             const tbody = document.getElementById('kasaHistoryTableBody');
             tbody.innerHTML = '';
             
-            if (history.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: hsl(var(--text-muted)); padding: 24px;">Henüz hiç işlem bulunmuyor.</td></tr>';
+            let dataToRender = window.vaultHistoryData || [];
+
+            // Apply filters
+            const fDate = document.getElementById('filterKasaDate')?.value;
+            const fAccount = document.getElementById('filterKasaAccount')?.value;
+            const fType = document.getElementById('filterKasaType')?.value;
+            const fAmount = document.getElementById('filterKasaAmount')?.value;
+
+            if (fDate) dataToRender = dataToRender.filter(t => t.date === fDate);
+            if (fAccount) dataToRender = dataToRender.filter(t => t.accountName === fAccount);
+            if (fType) dataToRender = dataToRender.filter(t => t.type === fType);
+            if (fAmount) dataToRender = dataToRender.filter(t => t.amount.toString().includes(fAmount));
+
+            if (dataToRender.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: hsl(var(--text-muted)); padding: 24px;">Filtrelere uygun işlem bulunamadı.</td></tr>';
                 return;
             }
 
-            history.forEach(item => {
+            dataToRender.forEach(item => {
                 const [y, m, d] = item.date.split('-');
                 const isIncome = item.type === 'income';
                 const sign = isIncome ? '+' : '-';

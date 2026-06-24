@@ -522,6 +522,7 @@ export async function GET(req: NextRequest) {
           telegram_bot_token: result.telegram_bot_token ?? '',
           telegram_chat_id: result.telegram_chat_id ?? '',
           gemini_api_key: result.gemini_api_key ?? '',
+          payment_accounts: result.payment_accounts ?? '',
         },
       });
     }
@@ -930,6 +931,9 @@ export async function POST(req: NextRequest) {
         'smtp_user',
         'smtp_pass',
         'gemini_api_key',
+        'telegram_bot_token',
+        'telegram_chat_id',
+        'payment_accounts',
       ];
 
       for (const key of keys) {
