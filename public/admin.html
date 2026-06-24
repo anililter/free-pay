@@ -652,6 +652,41 @@
             font-weight: 700;
         }
 
+        /* Panel card containers */
+        .panel {
+            background: hsl(var(--bg-card));
+            border: 1px solid hsl(var(--border-color));
+            border-radius: var(--radius-lg);
+            padding: 20px 24px;
+            box-shadow: var(--shadow-md);
+            width: 100%;
+        }
+
+        .panel-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 16px;
+            padding-bottom: 14px;
+            border-bottom: 1px solid hsl(var(--border-color));
+        }
+
+        .panel-header h2 {
+            font-size: 16px;
+            font-weight: 800;
+            letter-spacing: -0.3px;
+            color: hsl(var(--text-primary));
+        }
+
+        .panel > .table-container {
+            border: none;
+            border-radius: 0;
+            box-shadow: none;
+            margin-bottom: 0;
+            margin-left: -24px;
+            margin-right: -24px;
+            width: calc(100% + 48px);
+        }
+
         /* Brand list page style */
         .brands-grid {
             display: grid;
@@ -1020,7 +1055,13 @@
                 right: 12px;
             }
 
-            /* Settings tab — grid rows become single column */
+            /* Panel mobile padding */
+            .panel {
+                padding: 14px 16px;
+            }
+            .panel-header h2 {
+                font-size: 14px;
+            }
             .settings-grid, .settings-row {
                 grid-template-columns: 1fr !important;
             }
@@ -1175,7 +1216,7 @@
                             <th width="12%">Ödeme Yeri / Hesap</th>
                             <th width="18%">Müşteri & Marka</th>
                             <th width="17%">Durum</th>
-                            <th width="10%">Anlaşılan</th>
+                            <th width="13%" style="white-space: nowrap;">Anlaşılan</th>
                             <th width="12%">Ödeme Notu</th>
                         </tr>
                     </thead>
@@ -1306,7 +1347,7 @@
             </div>
         </div>
 
-        <div id="tabViewKasa" class="tab-content">
+        <div id="tabViewKasa" class="tab-content" style="display: flex; flex-direction: column; gap: 24px;">
             <div class="panel">
                 <div class="panel-header" style="justify-content: space-between; align-items: flex-end;">
                     <div>
@@ -1319,13 +1360,13 @@
                     <button class="btn btn-primary" onclick="openKasaTransactionModal('', 'income')">+ Yeni İşlem / Hesap Ekle</button>
                 </div>
                 <!-- Kasa Accounts Grid -->
-                <div id="kasaGrid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-top: 16px;">
+                <div id="kasaGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; margin-top: 16px; width: 100%;">
                     <!-- Will be populated by JS -->
                 </div>
             </div>
 
 
-            <div class="panel" style="margin-top: 24px;">
+            <div class="panel">
                 <div class="panel-header" style="justify-content: space-between;">
                     <h2>Hesap İşlem Geçmişi (Ledger)</h2>
                     <button id="btnResetVaultFilter" class="btn btn-outline" style="display: none; padding: 6px 12px; font-size: 13px;" onclick="resetVaultFilter()">Tüm İşlemleri Göster</button>
