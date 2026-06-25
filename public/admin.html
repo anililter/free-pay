@@ -2439,17 +2439,20 @@
         // Fetch data
         async function loadAllData() {
             try {
-                await loadSettings(); // ensure settings are loaded first
+                // Settings yükleme hatası diğer verileri engellemesin
+                try { await loadSettings(); } catch(e) { console.warn('Settings yüklenemedi:', e); }
+                
                 const response = await fetch('/api/legacy?api=clients_list');
                 const result = await response.json();
                 if (result.success) {
                     allClients = result.data;
+                    window.allClients = allClients; // global erişim için
                     window.passiveMonths = result.passive_months || 0;
                 }
                 
                 loadPaymentsList();
                 renderBrands();
-                renderRoutine(); // Added this so it updates if user already switched to it
+                renderRoutine();
             } catch (err) {
                 console.error(err);
                 showToast('Hizmet bağlantı hatası.', 'danger');
