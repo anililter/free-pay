@@ -2448,6 +2448,7 @@
                 
                 loadPaymentsList();
                 renderBrands();
+                renderRoutine(); // Added this so it updates if user already switched to it
             } catch (err) {
                 console.error(err);
                 showToast('Hizmet bağlantı hatası.', 'danger');
