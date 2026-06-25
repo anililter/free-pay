@@ -2239,7 +2239,7 @@
             const activeClients = allClients.filter(c => c.status && c.status.toLowerCase().trim() === 'aktif');
             
             if (activeClients.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding: 20px; color:hsl(var(--text-muted));">Aktif müşteri bulunamadı (Tüm müşteriler pasif olabilir). DEBUG: allClients.length = ' + allClients.length + ', activeClients.length=0. First status: ' + (allClients[0] ? allClients[0].status : 'N/A')</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding: 20px; color:hsl(var(--text-muted));">Aktif müşteri bulunamadı (Tüm müşteriler pasif olabilir). DEBUG: allClients.length = ' + allClients.length + ', activeClients.length=0. First status: ' + (allClients[0] ? allClients[0].status : 'N/A') + '</td></tr>';
                 return;
             }
             
