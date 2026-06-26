@@ -1742,9 +1742,16 @@
                     </div>
                     <div class="form-group">
                         <label class="form-label">İşlem Yönü</label>
-                        <select id="ktType" class="form-input" required>
+                        <select id="ktType" class="form-input" required onchange="onKtTypeChange()">
                             <option value="income">Para Girişi (Gelir)</option>
                             <option value="expense">Para Çıkışı (Gider/Çekim)</option>
+                            <option value="transfer">↔ Transfer (Kasadan Kasaya)</option>
+                        </select>
+                    </div>
+                    <div class="form-group" id="ktTargetAccountRow" style="display:none;">
+                        <label class="form-label">Hedef Hesap</label>
+                        <select id="ktTargetAccount" class="form-control account-select">
+                            <option value="">Seçiniz...</option>
                         </select>
                     </div>
                     <div class="form-group">
@@ -4442,6 +4449,23 @@
             document.getElementById('kasaTransactionModal').classList.remove('show');
         };
 
+        window.onKtTypeChange = function() {
+            const type = document.getElementById('ktType').value;
+            const targetRow = document.getElementById('ktTargetAccountRow');
+            const targetSelect = document.getElementById('ktTargetAccount');
+            if (type === 'transfer') {
+                targetRow.style.display = '';
+                targetSelect.required = true;
+                // Populate with current accounts
+                const accounts = window.paymentAccountsList || [];
+                targetSelect.innerHTML = '<option value="">Seçiniz...</option>' +
+                    accounts.map(a => `<option value="${escapeHtml(a)}">${escapeHtml(a)}</option>`).join('');
+            } else {
+                targetRow.style.display = 'none';
+                targetSelect.required = false;
+            }
+        };
+
         window.submitKasaTransaction = async function(e) {
             e.preventDefault();
             const btn = document.getElementById('ktSaveBtn');
@@ -4450,11 +4474,63 @@
             btn.disabled = true;
 
             const id = document.getElementById('ktId').value;
+            const txType = document.getElementById('ktType').value;
+
+            // --- TRANSFER: 2 kayıt oluştur ---
+            if (txType === 'transfer' && !id) {
+                const sourceAccount = document.getElementById('ktAccountName').value;
+                const targetAccount = document.getElementById('ktTargetAccount').value;
+                const amount = document.getElementById('ktAmount').value;
+                const date = document.getElementById('ktDate').value;
+                const notes = document.getElementById('ktNotes').value;
+                const transferNote = `Transfer: ${sourceAccount} → ${targetAccount}${notes ? ' | ' + notes : ''}`;
+
+                if (!targetAccount) {
+                    showToast('Lütfen hedef hesabı seçin.', 'warning');
+                    btn.innerHTML = orig; btn.disabled = false;
+                    return;
+                }
+                if (sourceAccount === targetAccount) {
+                    showToast('Kaynak ve hedef hesap aynı olamaz.', 'warning');
+                    btn.innerHTML = orig; btn.disabled = false;
+                    return;
+                }
+
+                try {
+                    // 1) Kaynaktan çıkış
+                    const r1 = await fetch('/api/legacy?api=vault_transaction_create', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({ account_name: sourceAccount, type: 'expense', amount, date, description: transferNote, client_name: '' })
+                    });
+                    // 2) Hedefe giriş
+                    const r2 = await fetch('/api/legacy?api=vault_transaction_create', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({ account_name: targetAccount, type: 'income', amount, date, description: transferNote, client_name: '' })
+                    });
+                    const res1 = await r1.json();
+                    const res2 = await r2.json();
+                    if (res1.success && res2.success) {
+                        showToast('Transfer kaydedildi.', 'success');
+                        closeKasaTransactionModal();
+                        loadKasa();
+                    } else {
+                        showToast('Transfer sırasında hata oluştu.', 'danger');
+                    }
+                } catch(err) {
+                    showToast('Bağlantı hatası.', 'danger');
+                } finally {
+                    btn.innerHTML = orig; btn.disabled = false;
+                }
+                return;
+            }
+
             const apiEndpoint = id ? 'vault_transaction_update' : 'vault_transaction_create';
 
             const payload = {
                 account_name: document.getElementById('ktAccountName').value,
-                type: document.getElementById('ktType').value,
+                type: txType,
                 amount: document.getElementById('ktAmount').value,
                 date: document.getElementById('ktDate').value,
                 description: document.getElementById('ktNotes').value,
