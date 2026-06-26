@@ -4456,10 +4456,17 @@
             if (type === 'transfer') {
                 targetRow.style.display = '';
                 targetSelect.required = true;
-                // Populate with current accounts
-                const accounts = window.paymentAccountsList || [];
+                // Aynı populateAccountSelects mantığıyla tüm hesapları topla
+                let accounts = window.paymentAccountsList ? [...window.paymentAccountsList] : [];
+                if (window.vaultHistoryData) {
+                    window.vaultHistoryData.forEach(tx => {
+                        if (tx.accountName && !accounts.includes(tx.accountName)) {
+                            accounts.push(tx.accountName);
+                        }
+                    });
+                }
                 targetSelect.innerHTML = '<option value="">Seçiniz...</option>' +
-                    accounts.map(a => `<option value="${escapeHtml(a)}">${escapeHtml(a)}</option>`).join('');
+                    accounts.filter(a => a.trim()).map(a => `<option value="${escapeHtml(a.trim())}">${escapeHtml(a.trim())}</option>`).join('');
             } else {
                 targetRow.style.display = 'none';
                 targetSelect.required = false;
