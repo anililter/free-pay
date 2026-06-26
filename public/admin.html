@@ -1786,6 +1786,18 @@
         </div>
     </div>
 
+    <!-- Not Geçmişi Modal -->
+    <div class="modal-backdrop" id="noteHistoryModal">
+        <div class="modal-card" style="max-width: 480px;">
+            <div class="modal-header">
+                <h3 class="modal-title" id="noteHistoryTitle">Not Geçmişi</h3>
+                <button class="modal-close" onclick="closeNoteHistory()"><i data-lucide="x" style="width:16px;height:16px;"></i></button>
+            </div>
+            <div class="modal-body" id="noteHistoryBody" style="max-height:400px; overflow-y:auto; padding:0;">
+            </div>
+        </div>
+    </div>
+
     <!-- Image View Modal -->
     <div class="modal-backdrop" id="imageViewModal">
         <div class="modal-card" style="max-width: 800px; padding: 0; background: transparent; box-shadow: none;">
@@ -2243,7 +2255,37 @@
         };
 
         // --- GÜNLÜK RUTİN FONKSİYONLARI ---
-        window.dailyRoutinesMap = {}; // { "clientId": "green" }
+        // Veri yapısı: { statuses: {clientId: 'green'|'orange'|'red'}, notes: {clientId: [{date, text},...]} }
+        window.dailyStatusMap = {};
+        window.dailyNotesMap = {};
+
+        function parseRoutineData(str) {
+            try {
+                const parsed = JSON.parse(str || '{}');
+                if (parsed && typeof parsed.statuses === 'object') {
+                    // Yeni format
+                    return { statuses: parsed.statuses || {}, notes: parsed.notes || {} };
+                }
+                // Eski format: { clientId: 'green' } -> migrate
+                const statuses = {};
+                for (const [k, v] of Object.entries(parsed)) {
+                    if (typeof v === 'string') statuses[k] = v;
+                }
+                return { statuses, notes: {} };
+            } catch(e) { return { statuses: {}, notes: {} }; }
+        }
+
+        function saveRoutineData() {
+            const data = { statuses: window.dailyStatusMap || {}, notes: window.dailyNotesMap || {} };
+            const jsonStr = JSON.stringify(data);
+            const el = document.getElementById('settingsPaymentAccounts');
+            if (el) el.setAttribute('data-routines', jsonStr);
+            fetch('/api/legacy?api=settings_save', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ daily_routines: jsonStr })
+            }).catch(e => console.error(e));
+        }
 
         window.renderRoutine = function() {
             const tbody = document.getElementById('routineTableBody');
@@ -2259,10 +2301,15 @@
             try {
                 const el = document.getElementById('settingsPaymentAccounts');
                 const savedStr = (el ? el.getAttribute('data-routines') : null) || '{}';
-                window.dailyRoutinesMap = JSON.parse(savedStr);
+                const data = parseRoutineData(savedStr);
+                window.dailyStatusMap = data.statuses;
+                window.dailyNotesMap = data.notes;
             } catch(e) {
-                window.dailyRoutinesMap = {};
+                window.dailyStatusMap = {};
+                window.dailyNotesMap = {};
             }
+
+            const today = new Date().toISOString().split('T')[0];
 
             // Sadece aktif müşteriler
             const activeClients = allClients.filter(c => c.status && c.status.toLowerCase().trim() === 'aktif');
@@ -2274,20 +2321,28 @@
             
             activeClients.forEach(client => {
                 try {
-                    const status = window.dailyRoutinesMap[client.id] || 'none';
+                    const status = window.dailyStatusMap[client.id] || 'none';
+                    const clientNotes = window.dailyNotesMap[client.id] || [];
+                    const todayNote = clientNotes.find(n => n.date === today);
+                    const pastCount = clientNotes.filter(n => n.date !== today).length;
+                    const noteVal = todayNote ? todayNote.text.replace(/"/g, '&quot;') : '';
                     
                     let bgColor = 'white';
                     let textColor = 'hsl(var(--text-primary))';
+                    let inputStyle = 'background:rgba(0,0,0,0.04); color:hsl(var(--text-primary));';
                     
                     if (status === 'green') {
-                        bgColor = '#22c55e'; // tailwind green-500
+                        bgColor = '#22c55e';
                         textColor = 'white';
+                        inputStyle = 'background:rgba(255,255,255,0.25); color:white;';
                     } else if (status === 'orange') {
-                        bgColor = '#f97316'; // tailwind orange-500
+                        bgColor = '#f97316';
                         textColor = 'white';
+                        inputStyle = 'background:rgba(255,255,255,0.25); color:white;';
                     } else if (status === 'red') {
-                        bgColor = '#ef4444'; // tailwind red-500
+                        bgColor = '#ef4444';
                         textColor = 'white';
+                        inputStyle = 'background:rgba(255,255,255,0.25); color:white;';
                     }
 
                     const tr = document.createElement('tr');
@@ -2295,12 +2350,24 @@
                     tr.style.color = textColor;
                     tr.style.transition = 'all 0.3s ease';
                     
+                    const historyBtn = clientNotes.length > 0
+                        ? `<button title="Not geçmişi" class="btn btn-secondary" style="padding:2px 7px; font-size:11px; white-space:nowrap; flex-shrink:0;" onclick="showNoteHistory(${client.id},'${escapeHtml(client.name||'').replace(/'/g,"\\'")}')">📋${pastCount>0?' '+pastCount:''}</button>`
+                        : '';
+                    
                     tr.innerHTML = `
                         <td style="padding:14px; font-weight:600; border-bottom: 1px solid hsla(0,0%,0%,0.05);">${escapeHtml(client.name || '')}</td>
                         <td style="padding:14px; border-bottom: 1px solid hsla(0,0%,0%,0.05);">${escapeHtml(client.status)}</td>
                         <td style="padding:14px; text-align:right; font-weight:700; border-bottom: 1px solid hsla(0,0%,0%,0.05);">${formatCurrency(client.agreed_amount, client.currency)}</td>
                         <td style="padding:14px; text-align:center; font-weight:700; border-bottom: 1px solid hsla(0,0%,0%,0.05);">${client.payment_day ? 'Her ayın ' + client.payment_day + '. günü' : '-'}</td>
-                        <td style="padding:10px; border-bottom: 1px solid hsla(0,0%,0%,0.05); color:hsl(var(--text-muted)); font-size:13px;">${escapeHtml(client.notes || '')}</td>
+                        <td style="padding:8px 10px; border-bottom: 1px solid hsla(0,0%,0%,0.05);">
+                            <div style="display:flex; gap:6px; align-items:center;">
+                                <input type="text" placeholder="Not ekle..." value="${noteVal}" data-cid="${client.id}"
+                                    style="flex:1; min-width:0; border:1px solid rgba(0,0,0,0.15); border-radius:6px; padding:5px 8px; font-size:12px; ${inputStyle}"
+                                    onblur="saveRoutineNote(this.dataset.cid, this.value)"
+                                    onkeydown="if(event.key==='Enter'){this.blur()}">
+                                ${historyBtn}
+                            </div>
+                        </td>
                         <td style="padding:10px; text-align:center; border-bottom: 1px solid hsla(0,0%,0%,0.05);">
                             <div style="display:flex; gap:6px; justify-content:center;">
                                 <button title="Düzenlendi (Yeşil)" class="btn" style="background:#22c55e; color:white; width:28px; height:28px; padding:0; display:flex; align-items:center; justify-content:center; border-radius:4px; border:1px solid rgba(0,0,0,0.1);" onclick="updateRoutineStatus(${client.id}, 'green')">
@@ -2326,41 +2393,61 @@
             lucide.createIcons();
         };
 
-        window.updateRoutineStatus = async function(clientId, status) {
-            if (status === 'none') {
-                delete window.dailyRoutinesMap[clientId];
-            } else {
-                window.dailyRoutinesMap[clientId] = status;
+        window.saveRoutineNote = function(clientId, text) {
+            const today = new Date().toISOString().split('T')[0];
+            if (!window.dailyNotesMap[clientId]) window.dailyNotesMap[clientId] = [];
+            // Bugünkü notu kaldır, yeni ekle
+            window.dailyNotesMap[clientId] = window.dailyNotesMap[clientId].filter(n => n.date !== today);
+            if (text && text.trim()) {
+                window.dailyNotesMap[clientId].unshift({ date: today, text: text.trim() });
             }
-            
-            const routinesStr = JSON.stringify(window.dailyRoutinesMap);
-            document.getElementById('settingsPaymentAccounts').setAttribute('data-routines', routinesStr);
-            
-            renderRoutine();
-            
-            // Auto save silently
-            fetch('/api/legacy?api=settings_save', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ daily_routines: routinesStr })
-            }).catch(e => console.error(e));
+            saveRoutineData();
         };
 
-        window.clearAllRoutines = async function() {
-            if (!confirm('Tüm müşterilerin renk durumlarını sıfırlamak (Yeni güne başlamak) istediğinize emin misiniz?')) return;
-            
-            window.dailyRoutinesMap = {};
-            document.getElementById('settingsPaymentAccounts').setAttribute('data-routines', '{}');
-            
+        window.showNoteHistory = function(clientId, clientName) {
+            const notes = window.dailyNotesMap[clientId] || [];
+            document.getElementById('noteHistoryTitle').textContent = (clientName || 'Müşteri') + ' — Not Geçmişi';
+            const body = document.getElementById('noteHistoryBody');
+            if (notes.length === 0) {
+                body.innerHTML = '<p style="color:hsl(var(--text-muted)); text-align:center; padding:20px;">Henüz not girilmemiş.</p>';
+            } else {
+                body.innerHTML = notes.map(n => `
+                    <div style="padding:12px 16px; border-bottom:1px solid hsl(var(--border-color));">
+                        <div style="font-size:11px; color:hsl(var(--text-muted)); margin-bottom:4px; font-weight:600;">${escapeHtml(n.date)}</div>
+                        <div style="font-size:14px; color:hsl(var(--text-primary));">${escapeHtml(n.text)}</div>
+                    </div>
+                `).join('');
+            }
+            document.getElementById('noteHistoryModal').classList.add('show');
+        };
+
+        window.closeNoteHistory = function() {
+            document.getElementById('noteHistoryModal').classList.remove('show');
+        };
+
+        window.updateRoutineStatus = function(clientId, status) {
+            if (!window.dailyStatusMap) window.dailyStatusMap = {};
+            if (status === 'none') {
+                delete window.dailyStatusMap[clientId];
+            } else {
+                window.dailyStatusMap[clientId] = status;
+            }
+            saveRoutineData();
             renderRoutine();
-            
-            // Auto save silently
-            fetch('/api/legacy?api=settings_save', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ daily_routines: '{}' })
-            }).then(() => showToast('Yeni güne başlandı, tüm renkler sıfırlandı!', 'success'))
-              .catch(e => console.error(e));
+        };
+
+        window.clearAllRoutines = function() {
+            if (!confirm('Yeni güne başlamak istediğinize emin misiniz?\n\n• Yeşil ve turuncu renkler sıfırlanacak\n• Kırmızı hesaplar değişmeyecek\n• Notlar silinmeyecek')) return;
+            // Sadece green/orange sıfırla, red kalsın
+            if (!window.dailyStatusMap) window.dailyStatusMap = {};
+            Object.keys(window.dailyStatusMap).forEach(id => {
+                if (window.dailyStatusMap[id] !== 'red') {
+                    delete window.dailyStatusMap[id];
+                }
+            });
+            saveRoutineData();
+            renderRoutine();
+            showToast('Yeni güne başlandı! Kırmızı hesaplar ve notlar korundu.', 'success');
         };
 
         window.generateGeminiAnalysis = async function(btnEl) {
