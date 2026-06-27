@@ -1124,7 +1124,40 @@ export async function POST(req: NextRequest) {
       return ok({ message: 'Balance adjusted' });
     }
 
+    // -----------------------------------------------------------------------
+    // gemini_improve_note — not metnini Gemini ile iyileştir
+    // -----------------------------------------------------------------------
+    if (api === 'gemini_improve_note') {
+      const { text } = body;
+      if (!text || !text.trim()) return fail('Not metni boş olamaz');
+
+      // Gemini API anahtarını DB'den al
+      const [apiKeyRow] = await db.select().from(settings).where(eq(settings.key, 'gemini_api_key'));
+      const geminiKey = apiKeyRow?.value?.trim();
+      if (!geminiKey) return fail('Gemini API anahtarı ayarlanmamış. Lütfen Ayarlar > Gemini API Key alanına anahtarınızı girin.');
+
+      const prompt = `Sen profesyonel bir dijital pazarlama ajans asistanısın. Aşağıdaki notu daha açık, profesyonel ve anlaşılır hale getir. Türkçe yaz. Ekstra açıklama ekleme, sadece iyileştirilmiş notu döndür:\n\n"${text.trim()}"`;
+
+      const geminiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
+      });
+
+      if (!geminiRes.ok) {
+        const errText = await geminiRes.text();
+        return fail('Gemini API hatası: ' + errText.slice(0, 200));
+      }
+
+      const geminiData = await geminiRes.json();
+      const improved = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+      if (!improved) return fail('Gemini yanıt döndürmedi');
+
+      return ok({ improved });
+    }
+
     return fail('Unknown API endpoint');
+
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Internal server error';
     console.error('Legacy API POST Error:', error);

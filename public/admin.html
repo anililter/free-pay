@@ -1615,9 +1615,15 @@
                     <i data-lucide="check-square" style="width:24px; height:24px; color:hsl(var(--primary));"></i>
                     <h2 style="margin:0; font-size: 18px; font-weight: 800;">Günlük Kontrol Listesi</h2>
                 </div>
-                <div class="filter-group">
+                <div class="filter-group" style="gap:8px;">
+                    <button type="button" id="btnNotificationPerm" class="btn btn-outline" onclick="requestNotificationPermission()" style="display:flex; align-items:center; gap:6px; font-size:13px;">
+                        <i data-lucide="bell" style="width:15px; height:15px;"></i> <span id="notifBtnLabel">Bildirim</span>
+                    </button>
+                    <button type="button" class="btn btn-secondary" onclick="openDatedNoteModal()" style="display:flex; align-items:center; gap:6px; font-size:13px;">
+                        <i data-lucide="calendar-plus" style="width:15px; height:15px;"></i> Tarihli Not
+                    </button>
                     <button type="button" class="btn btn-secondary" onclick="clearAllRoutines()" style="display:flex; align-items:center; gap:8px;">
-                        <i data-lucide="refresh-cw" style="width:16px; height:16px;"></i> Yeni Güne Başla (Sıfırla)
+                        <i data-lucide="refresh-cw" style="width:16px; height:16px;"></i> Yeni Güne Başla
                     </button>
                 </div>
             </div>
@@ -1782,6 +1788,47 @@
             <div class="modal-footer">
                 <button type="button" class="btn" style="background: hsl(var(--bg-base)); color: hsl(var(--text-primary)); border: 1px solid hsl(var(--border-color));" onclick="closeKasaTransactionModal()">İptal</button>
                 <button type="submit" form="ktForm" class="btn btn-primary" id="ktSaveBtn">Kaydet</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tarihli Not Modalı -->
+    <div class="modal-backdrop" id="datedNoteModal">
+        <div class="modal-card" style="max-width:480px;">
+            <div class="modal-header">
+                <h3 class="modal-title">Tarihli Not Ekle</h3>
+                <button class="modal-close" onclick="closeDatedNoteModal()"><i data-lucide="x" style="width:16px;height:16px;"></i></button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Müşteri</label>
+                    <select id="datedNoteClient" class="form-control" required><option value="">Seçiniz...</option></select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Tarih <small style="color:hsl(var(--text-muted));">(geçmiş veya ileri tarih)</small></label>
+                    <input type="date" id="datedNoteDate" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Not</label>
+                    <div style="display:flex; gap:8px; align-items:flex-start;">
+                        <textarea id="datedNoteText" class="form-control" rows="3" placeholder="Notu buraya girin..." style="flex:1; resize:vertical;"></textarea>
+                        <button type="button" class="btn btn-secondary" id="aiImproveDatedBtn" onclick="aiImproveDatedNote()" title="Yapay Zeka ile İyileştir" style="padding:8px 10px; white-space:nowrap; flex-shrink:0;">✨ AI</button>
+                    </div>
+                </div>
+                <div class="form-group" id="datedNoteNotifyGroup">
+                    <div style="display:flex; align-items:center; gap:10px; background:hsla(var(--primary-rgb),0.06); padding:12px; border-radius:8px; border:1px solid hsla(var(--primary-rgb),0.2);">
+                        <input type="checkbox" id="datedNoteNotify" style="width:18px;height:18px; cursor:pointer;">
+                        <label for="datedNoteNotify" style="cursor:pointer; font-weight:600; font-size:13px; display:flex; align-items:center; gap:6px;">
+                            <i data-lucide="bell" style="width:14px;height:14px;"></i>
+                            Bu tarihe geldiğinde tarayıcı bildirimi gönder
+                        </label>
+                    </div>
+                    <small style="color:hsl(var(--text-muted)); display:block; margin-top:6px;">İleri tarih seçildiğinde aktif olur. Sayfa açık olduğunda kontrol edilir.</small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn" style="background:hsl(var(--bg-base)); border:1px solid hsl(var(--border-color));" onclick="closeDatedNoteModal()">İptal</button>
+                <button type="button" class="btn btn-primary" onclick="saveDatedNote()">Kaydet</button>
             </div>
         </div>
     </div>
@@ -2360,11 +2407,12 @@
                         <td style="padding:14px; text-align:right; font-weight:700; border-bottom: 1px solid hsla(0,0%,0%,0.05);">${formatCurrency(client.agreed_amount, client.currency)}</td>
                         <td style="padding:14px; text-align:center; font-weight:700; border-bottom: 1px solid hsla(0,0%,0%,0.05);">${client.payment_day ? 'Her ayın ' + client.payment_day + '. günü' : '-'}</td>
                         <td style="padding:8px 10px; border-bottom: 1px solid hsla(0,0%,0%,0.05);">
-                            <div style="display:flex; gap:6px; align-items:center;">
+                            <div style="display:flex; gap:4px; align-items:center;">
                                 <input type="text" placeholder="Not ekle..." value="${noteVal}" data-cid="${client.id}"
                                     style="flex:1; min-width:0; border:1px solid rgba(0,0,0,0.15); border-radius:6px; padding:5px 8px; font-size:12px; ${inputStyle}"
                                     onblur="saveRoutineNote(this.dataset.cid, this.value)"
                                     onkeydown="if(event.key==='Enter'){this.blur()}">
+                                <button title="AI ile iyileştir" class="btn btn-secondary" style="padding:3px 7px; font-size:11px; flex-shrink:0; white-space:nowrap;" onclick="aiImproveNote(${client.id}, this.closest('div').querySelector('input'), this)">✨</button>
                                 ${historyBtn}
                             </div>
                         </td>
@@ -2424,6 +2472,164 @@
         window.closeNoteHistory = function() {
             document.getElementById('noteHistoryModal').classList.remove('show');
         };
+
+        // ---- AI Not İyileştirme (satır içi) ----
+        window.aiImproveNote = async function(clientId, inputEl, btnEl) {
+            const text = inputEl.value.trim();
+            if (!text) { showToast('Önce bir not yazın.', 'warning'); return; }
+            const orig = btnEl.textContent;
+            btnEl.textContent = '...';
+            btnEl.disabled = true;
+            try {
+                const res = await fetch('/api/legacy?api=gemini_improve_note', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ text })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    inputEl.value = data.improved;
+                    showToast('Not yapay zeka ile iyileştirildi!', 'success');
+                } else {
+                    showToast(data.error || 'Hata oluştu.', 'danger');
+                }
+            } catch(e) {
+                showToast('Bağlantı hatası.', 'danger');
+            } finally {
+                btnEl.textContent = orig;
+                btnEl.disabled = false;
+            }
+        };
+
+        // ---- Tarihli Not Modalı ----
+        window.openDatedNoteModal = function() {
+            // Aktif müşterileri doldur
+            const sel = document.getElementById('datedNoteClient');
+            const active = (allClients || []).filter(c => c.status && c.status.toLowerCase().trim() === 'aktif');
+            sel.innerHTML = '<option value="">Seçiniz...</option>' +
+                active.map(c => `<option value="${c.id}">${escapeHtml(c.name || '')}</option>`).join('');
+            // Tarihi bugüne set et
+            document.getElementById('datedNoteDate').value = new Date().toISOString().split('T')[0];
+            document.getElementById('datedNoteText').value = '';
+            document.getElementById('datedNoteNotify').checked = false;
+            document.getElementById('datedNoteModal').classList.add('show');
+        };
+
+        window.closeDatedNoteModal = function() {
+            document.getElementById('datedNoteModal').classList.remove('show');
+        };
+
+        window.aiImproveDatedNote = async function() {
+            const textarea = document.getElementById('datedNoteText');
+            const btn = document.getElementById('aiImproveDatedBtn');
+            const text = textarea.value.trim();
+            if (!text) { showToast('Önce bir not yazın.', 'warning'); return; }
+            const orig = btn.textContent;
+            btn.textContent = '...';
+            btn.disabled = true;
+            try {
+                const res = await fetch('/api/legacy?api=gemini_improve_note', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ text })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    textarea.value = data.improved;
+                    showToast('Not iyileştirildi!', 'success');
+                } else {
+                    showToast(data.error || 'Hata oluştu.', 'danger');
+                }
+            } catch(e) {
+                showToast('Bağlantı hatası.', 'danger');
+            } finally {
+                btn.textContent = orig;
+                btn.disabled = false;
+            }
+        };
+
+        window.saveDatedNote = function() {
+            const clientId = document.getElementById('datedNoteClient').value;
+            const date = document.getElementById('datedNoteDate').value;
+            const text = document.getElementById('datedNoteText').value.trim();
+            const notify = document.getElementById('datedNoteNotify').checked;
+
+            if (!clientId) { showToast('Müşteri seçin.', 'warning'); return; }
+            if (!date) { showToast('Tarih seçin.', 'warning'); return; }
+            if (!text) { showToast('Not boş olamaz.', 'warning'); return; }
+
+            if (!window.dailyNotesMap[clientId]) window.dailyNotesMap[clientId] = [];
+            // Aynı tarihte varsa güncelle
+            window.dailyNotesMap[clientId] = window.dailyNotesMap[clientId].filter(n => n.date !== date);
+            window.dailyNotesMap[clientId].unshift({ date, text, notify: notify ? true : undefined, notified: false });
+            // Tarihe göre sırala (en yeni üstte)
+            window.dailyNotesMap[clientId].sort((a,b) => b.date.localeCompare(a.date));
+
+            saveRoutineData();
+            closeDatedNoteModal();
+            renderRoutine();
+            showToast('Not kaydedildi.', 'success');
+        };
+
+        // ---- Tarayıcı Bildirimleri ----
+        window.requestNotificationPermission = async function() {
+            if (!('Notification' in window)) {
+                showToast('Tarayıcınız bildirimleri desteklemiyor.', 'warning');
+                return;
+            }
+            const perm = await Notification.requestPermission();
+            updateNotifBtn(perm);
+            if (perm === 'granted') showToast('Bildirimler etkinleştirildi!', 'success');
+            else showToast('Bildirim izni verilmedi.', 'warning');
+        };
+
+        function updateNotifBtn(perm) {
+            const btn = document.getElementById('btnNotificationPerm');
+            const lbl = document.getElementById('notifBtnLabel');
+            if (!btn || !lbl) return;
+            if (perm === 'granted') {
+                lbl.textContent = 'Bildirim Açık ✓';
+                btn.style.color = '#22c55e';
+                btn.style.borderColor = '#22c55e';
+            } else if (perm === 'denied') {
+                lbl.textContent = 'Bildirim Kapalı';
+                btn.style.opacity = '0.5';
+            }
+        }
+
+        function checkScheduledNotifications() {
+            if (!('Notification' in window) || Notification.permission !== 'granted') return;
+            const today = new Date().toISOString().split('T')[0];
+            const notesMap = window.dailyNotesMap || {};
+            let changed = false;
+
+            for (const clientId in notesMap) {
+                const notes = notesMap[clientId];
+                for (const note of notes) {
+                    if (note.notify && !note.notified && note.date <= today) {
+                        // Müşteri adını bul
+                        const client = (allClients || []).find(c => String(c.id) === String(clientId));
+                        const name = client ? client.name : 'Müşteri';
+                        new Notification('📋 ' + name + ' — Hatırlatma', {
+                            body: note.text,
+                            icon: '/favicon.ico'
+                        });
+                        note.notified = true;
+                        changed = true;
+                    }
+                }
+            }
+            if (changed) saveRoutineData();
+        }
+
+        // Sayfa açıldığında bildirim durumunu kontrol et
+        if ('Notification' in window) {
+            updateNotifBtn(Notification.permission);
+        }
+        // Her 5 dakikada kontrol et
+        setInterval(checkScheduledNotifications, 5 * 60 * 1000);
+        // Sayfa açıldığında da bir kez çalıştır (biraz geciktirerek data yüklendikten sonra)
+        setTimeout(checkScheduledNotifications, 3000);
 
         window.updateRoutineStatus = function(clientId, status) {
             if (!window.dailyStatusMap) window.dailyStatusMap = {};
