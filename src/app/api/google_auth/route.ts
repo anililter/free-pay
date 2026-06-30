@@ -8,7 +8,10 @@ export async function GET() {
   const redirectUri = `${baseUrl}/api/google_callback`;
 
   if (!clientId) {
-    return NextResponse.json({ error: 'GOOGLE_CLIENT_ID not configured' }, { status: 500 });
+    return NextResponse.json({ 
+      error: 'GOOGLE_CLIENT_ID not configured', 
+      debug_env_keys: Object.keys(process.env).filter(k => !k.includes('PASS') && !k.includes('SECRET') && !k.includes('TOKEN'))
+    }, { status: 500 });
   }
 
   const params = new URLSearchParams({
