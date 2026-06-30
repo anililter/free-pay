@@ -13,7 +13,10 @@ async function saveSetting(key: string, value: string) {
 }
 
 export async function GET(req: NextRequest) {
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://paymentsystem-iota.vercel.app';
+  const allSettings = await db.select().from(settings);
+  const findVal = (key: string) => allSettings.find(s => s.key === key)?.value || null;
+
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || findVal('google_base_url') || 'https://paymentsystem-iota.vercel.app';
   const { searchParams } = new URL(req.url);
   const code = searchParams.get('code');
   const error = searchParams.get('error');
@@ -26,8 +29,13 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(`${baseUrl}/admin?google_error=no_code`);
   }
 
-  const clientId = process.env.GOOGLE_CLIENT_ID!;
-  const clientSecret = process.env.GOOGLE_CLIENT_SECRET!;
+  const clientId = process.env.GOOGLE_CLIENT_ID || findVal('google_client_id');
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET || findVal('google_client_secret');
+  
+  if (!clientId || !clientSecret) {
+    return NextResponse.redirect(`${baseUrl}/admin?google_error=not_configured_in_db`);
+  }
+
   const redirectUri = `${baseUrl}/api/google_callback`;
 
   // Exchange code for tokens

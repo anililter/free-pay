@@ -1,16 +1,20 @@
 import { NextResponse } from 'next/server';
+import { db } from '@/db';
+import { settings } from '@/db/schema';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
-  const clientId = process.env.GOOGLE_CLIENT_ID;
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://paymentsystem-iota.vercel.app';
+  const allSettings = await db.select().from(settings);
+  const findVal = (key: string) => allSettings.find(s => s.key === key)?.value || null;
+
+  const clientId = process.env.GOOGLE_CLIENT_ID || findVal('google_client_id');
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || findVal('google_base_url') || 'https://paymentsystem-iota.vercel.app';
   const redirectUri = `${baseUrl}/api/google_callback`;
 
   if (!clientId) {
     return NextResponse.json({ 
-      error: 'GOOGLE_CLIENT_ID not configured', 
-      debug_env_keys: Object.keys(process.env).filter(k => !k.includes('PASS') && !k.includes('SECRET') && !k.includes('TOKEN'))
+      error: 'GOOGLE_CLIENT_ID not configured in env or settings table'
     }, { status: 500 });
   }
 
