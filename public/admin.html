@@ -1619,6 +1619,9 @@
                     <button type="button" id="btnNotificationPerm" class="btn btn-outline" onclick="requestNotificationPermission()" style="display:flex; align-items:center; gap:6px; font-size:13px;">
                         <i data-lucide="bell" style="width:15px; height:15px;"></i> <span id="notifBtnLabel">Bildirim</span>
                     </button>
+                    <button type="button" id="btnGoogleTasks" class="btn btn-outline" onclick="handleGoogleTasksClick()" style="display:flex; align-items:center; gap:6px; font-size:13px; color:#1a73e8; border-color:rgba(26,115,232,0.3);">
+                        <i data-lucide="chrome" style="width:15px; height:15px; color:#1a73e8;"></i> <span id="googleTasksLabel">Google Tasks Bağla</span>
+                    </button>
                     <button type="button" class="btn btn-secondary" onclick="openDatedNoteModal()" style="display:flex; align-items:center; gap:6px; font-size:13px;">
                         <i data-lucide="calendar-plus" style="width:15px; height:15px;"></i> Tarihli Not
                     </button>
@@ -1825,6 +1828,15 @@
                         </label>
                     </div>
                     <small style="color:hsl(var(--text-muted)); display:block; margin-top:6px;">İleri tarih seçildiğinde aktif olur. Sayfa açık olduğunda kontrol edilir.</small>
+                </div>
+                <div class="form-group" id="datedNoteGoogleGroup" style="display:none; margin-top:10px;">
+                    <div style="display:flex; align-items:center; gap:10px; background:rgba(26,115,232,0.06); padding:12px; border-radius:8px; border:1px solid rgba(26,115,232,0.2);">
+                        <input type="checkbox" id="datedNoteGoogle" style="width:18px;height:18px; cursor:pointer;">
+                        <label for="datedNoteGoogle" style="cursor:pointer; font-weight:600; font-size:13px; display:flex; align-items:center; gap:6px; color:#1a73e8;">
+                            <i data-lucide="check-square" style="width:14px;height:14px;"></i>
+                            Google Görevler'e (Tasks) Ekle
+                        </label>
+                    </div>
                 </div>
             </div>
             <div class="modal-footer">
@@ -2513,6 +2525,15 @@
             document.getElementById('datedNoteDate').value = new Date().toISOString().split('T')[0];
             document.getElementById('datedNoteText').value = '';
             document.getElementById('datedNoteNotify').checked = false;
+            
+            // Google Tasks görünürlüğü
+            const googleGroup = document.getElementById('datedNoteGoogleGroup');
+            if (googleGroup) {
+                googleGroup.style.display = window.googleTasksAuthenticated ? 'block' : 'none';
+            }
+            const googleChk = document.getElementById('datedNoteGoogle');
+            if (googleChk) googleChk.checked = false;
+
             document.getElementById('datedNoteModal').classList.add('show');
         };
 
@@ -2549,15 +2570,42 @@
             }
         };
 
-        window.saveDatedNote = function() {
+        window.saveDatedNote = async function() {
             const clientId = document.getElementById('datedNoteClient').value;
             const date = document.getElementById('datedNoteDate').value;
             const text = document.getElementById('datedNoteText').value.trim();
             const notify = document.getElementById('datedNoteNotify').checked;
+            const syncGoogle = document.getElementById('datedNoteGoogle')?.checked;
 
             if (!clientId) { showToast('Müşteri seçin.', 'warning'); return; }
             if (!date) { showToast('Tarih seçin.', 'warning'); return; }
             if (!text) { showToast('Not boş olamaz.', 'warning'); return; }
+
+            const client = (allClients || []).find(c => String(c.id) === String(clientId));
+            const clientName = client ? client.name : 'Müşteri';
+
+            // Google Görevler sync
+            if (syncGoogle && window.googleTasksAuthenticated) {
+                try {
+                    const response = await fetch('/api/legacy?api=google_create_task', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({
+                            title: `${clientName} — ${text}`,
+                            due: date
+                        })
+                    });
+                    const resJson = await response.json();
+                    if (resJson.success) {
+                        showToast('Google Görev oluşturuldu!', 'success');
+                    } else {
+                        showToast('Google Görev: ' + resJson.error, 'danger');
+                    }
+                } catch(e) {
+                    console.error(e);
+                    showToast('Google Görev eklenemedi.', 'danger');
+                }
+            }
 
             if (!window.dailyNotesMap[clientId]) window.dailyNotesMap[clientId] = [];
             // Aynı tarihte varsa güncelle
@@ -2631,6 +2679,59 @@
         setInterval(checkScheduledNotifications, 5 * 60 * 1000);
         // Sayfa açıldığında da bir kez çalıştır (biraz geciktirerek data yüklendikten sonra)
         setTimeout(checkScheduledNotifications, 3000);
+
+        window.googleTasksAuthenticated = false;
+
+        window.checkGoogleTasksStatus = async function() {
+            try {
+                const res = await fetch('/api/legacy?api=google_status');
+                const data = await res.json();
+                window.googleTasksAuthenticated = !!data.authenticated;
+                
+                const btn = document.getElementById('btnGoogleTasks');
+                const lbl = document.getElementById('googleTasksLabel');
+                if (btn && lbl) {
+                    if (window.googleTasksAuthenticated) {
+                        lbl.textContent = 'Google Tasks Bağlı ✓';
+                        btn.style.color = '#22c55e';
+                        btn.style.borderColor = '#22c55e';
+                    } else {
+                        lbl.textContent = 'Google Tasks Bağla';
+                        btn.style.color = '#1a73e8';
+                        btn.style.borderColor = 'rgba(26,115,232,0.3)';
+                    }
+                }
+            } catch(e) {
+                console.error('Error checking Google status:', e);
+            }
+        };
+
+        window.handleGoogleTasksClick = function() {
+            if (window.googleTasksAuthenticated) {
+                if (confirm('Google Görevler entegrasyonu zaten aktif. Başka bir hesapla yeniden bağlanmak istiyor musunuz?')) {
+                    window.location.href = '/api/google_auth';
+                }
+            } else {
+                window.location.href = '/api/google_auth';
+            }
+        };
+
+        // URL parametresi kontrolleri
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('google_connected')) {
+            setTimeout(() => {
+                showToast('Google Görevler başarıyla bağlandı!', 'success');
+                window.history.replaceState({}, document.title, window.location.pathname + window.location.hash);
+            }, 1000);
+        } else if (urlParams.get('google_error')) {
+            setTimeout(() => {
+                showToast('Google bağlantısı başarısız: ' + urlParams.get('google_error'), 'danger');
+                window.history.replaceState({}, document.title, window.location.pathname + window.location.hash);
+            }, 1000);
+        }
+
+        // Status kontrolü yap
+        setTimeout(window.checkGoogleTasksStatus, 1500);
 
         window.updateRoutineStatus = function(clientId, status) {
             if (!window.dailyStatusMap) window.dailyStatusMap = {};

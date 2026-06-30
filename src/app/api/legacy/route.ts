@@ -100,6 +100,62 @@ function fail(message: string, status = 400) {
   return NextResponse.json({ success: false, error: message }, { status });
 }
 
+async function getGoogleAccessToken(): Promise<string | null> {
+  const allSettings = await db.select().from(settings);
+  const findVal = (key: string) => allSettings.find(s => s.key === key)?.value || null;
+
+  const accessToken = findVal('google_access_token');
+  const refreshToken = findVal('google_refresh_token');
+  const expiryStr = findVal('google_token_expiry');
+
+  if (!accessToken) return null;
+
+  const expiry = expiryStr ? parseInt(expiryStr, 10) : 0;
+  // If expired or expiring in 1 minute, refresh
+  if (Date.now() + 60000 >= expiry && refreshToken) {
+    const clientId = process.env.GOOGLE_CLIENT_ID;
+    const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+    if (!clientId || !clientSecret) return accessToken;
+
+    try {
+      const res = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          refresh_token: refreshToken,
+          client_id: clientId,
+          client_secret: clientSecret,
+          grant_type: 'refresh_token',
+        }),
+      });
+
+      if (!res.ok) {
+        console.error('Failed to refresh google token', await res.text());
+        return null;
+      }
+
+      const data = await res.json();
+      const newAccess = data.access_token;
+      const expiresIn = data.expires_in || 3600;
+      const newExpiry = Date.now() + expiresIn * 1000;
+
+      await db.insert(settings)
+        .values({ key: 'google_access_token', value: newAccess })
+        .onConflictDoUpdate({ target: settings.key, set: { value: newAccess } });
+      await db.insert(settings)
+        .values({ key: 'google_token_expiry', value: String(newExpiry) })
+        .onConflictDoUpdate({ target: settings.key, set: { value: String(newExpiry) } });
+
+      return newAccess;
+    } catch (e) {
+      console.error('Error refreshing google token', e);
+      return null;
+    }
+  }
+
+  return accessToken;
+}
+
 // ---------------------------------------------------------------------------
 // GET handler
 // ---------------------------------------------------------------------------
@@ -638,6 +694,33 @@ export async function GET(req: NextRequest) {
       });
     }
 
+    // -----------------------------------------------------------------------
+    // google_status
+    // -----------------------------------------------------------------------
+    if (api === 'google_status') {
+      const token = await getGoogleAccessToken();
+      return ok({ authenticated: !!token });
+    }
+
+    // -----------------------------------------------------------------------
+    // google_tasklists
+    // -----------------------------------------------------------------------
+    if (api === 'google_tasklists') {
+      const token = await getGoogleAccessToken();
+      if (!token) return fail('Google hesabı bağlı değil', 401);
+
+      const res = await fetch('https://tasks.googleapis.com/v1/users/@me/lists', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (!res.ok) {
+        return fail('Google Tasks API hatası: ' + (await res.text()).slice(0, 150));
+      }
+
+      const data = await res.json();
+      return ok({ lists: data.items || [] });
+    }
+
     return fail('Unknown API endpoint');
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Internal server error';
@@ -1154,6 +1237,41 @@ export async function POST(req: NextRequest) {
       if (!improved) return fail('Gemini yanıt döndürmedi');
 
       return ok({ improved });
+    }
+
+    // -----------------------------------------------------------------------
+    // google_create_task
+    // -----------------------------------------------------------------------
+    if (api === 'google_create_task') {
+      const token = await getGoogleAccessToken();
+      if (!token) return fail('Google hesabı bağlı değil', 401);
+
+      const { tasklist_id, title, notes, due } = body;
+      if (!title) return fail('Görev başlığı zorunludur');
+
+      const tasklist = tasklist_id || '@default';
+      
+      const payload: Record<string, any> = { title };
+      if (notes) payload.notes = notes;
+      if (due) {
+        payload.due = due.includes('T') ? due : `${due}T09:00:00Z`;
+      }
+
+      const res = await fetch(`https://tasks.googleapis.com/v1/lists/${tasklist}/tasks`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        return fail('Google Tasks API görev oluşturma hatası: ' + (await res.text()).slice(0, 150));
+      }
+
+      const data = await res.json();
+      return ok({ task: data });
     }
 
     return fail('Unknown API endpoint');
