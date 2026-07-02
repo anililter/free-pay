@@ -177,6 +177,7 @@ async function getCurrentUser(req: NextRequest) {
           edit_clients: true,
           view_reports: true,
           edit_vault: true,
+          view_routine: true,
         },
       };
     }
@@ -197,6 +198,7 @@ async function getCurrentUser(req: NextRequest) {
           edit_clients: perms.edit_clients ?? (dbUser.role === 'admin'),
           view_reports: perms.view_reports ?? (dbUser.role === 'admin'),
           edit_vault: perms.edit_vault ?? (dbUser.role === 'admin'),
+          view_routine: perms.view_routine ?? (dbUser.role === 'admin' || dbUser.role === 'user'),
         },
       };
     }
@@ -1110,6 +1112,16 @@ export async function POST(req: NextRequest) {
     // settings_save
     // -----------------------------------------------------------------------
     if (api === 'settings_save') {
+      if (body.daily_routines !== undefined) {
+        if (!u || !u.permissions.view_routine) return fail('Günlük rutinleri güncelleme yetkiniz yok', 403);
+      }
+      const hasSystemSettings = Object.keys(body).some(k => k !== 'daily_routines');
+      if (hasSystemSettings) {
+        if (!u || (u.role !== 'superadmin' && u.role !== 'admin')) {
+          return fail('Sistem ayarlarını değiştirme yetkiniz yok', 403);
+        }
+      }
+
       const keys = [
         'smtp_host',
         'smtp_port',

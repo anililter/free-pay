@@ -1943,6 +1943,10 @@
                                 <input type="checkbox" id="permViewReports" style="width:16px; height:16px;">
                                 <label for="permViewReports" style="font-size:13px; font-weight:600; cursor:pointer;">Raporlar ve Grafik Analizini Gör</label>
                             </div>
+                            <div style="display:flex; align-items:center; gap:8px;">
+                                <input type="checkbox" id="permViewRoutine" style="width:16px; height:16px;">
+                                <label for="permViewRoutine" style="font-size:13px; font-weight:600; cursor:pointer;">Günlük Kontrol Listesini Gör / Yönet</label>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -2905,13 +2909,16 @@
             document.getElementById('tabBtnPayments').style.display = p.view_payments ? 'flex' : 'none';
             document.getElementById('tabBtnReports').style.display = p.view_reports ? 'flex' : 'none';
             document.getElementById('tabBtnKasa').style.display = p.view_vault ? 'flex' : 'none';
-            document.getElementById('tabBtnRoutine').style.display = p.view_payments ? 'flex' : 'none';
+            document.getElementById('tabBtnRoutine').style.display = p.view_routine ? 'flex' : 'none';
             
             // Hide whole sections if forbidden
             if (!p.view_payments && document.getElementById('tabViewPayments').classList.contains('active')) {
                 switchTab('clients');
             }
             if (!p.view_vault && document.getElementById('tabViewKasa')?.classList.contains('active')) {
+                switchTab('clients');
+            }
+            if (!p.view_routine && document.getElementById('tabViewRoutine')?.classList.contains('active')) {
                 switchTab('clients');
             }
 
@@ -2999,8 +3006,9 @@
                     document.getElementById('permViewPayments').checked = !!perms.view_payments;
                     document.getElementById('permViewVault').checked = !!perms.view_vault;
                     document.getElementById('permEditClients').checked = !!perms.edit_clients;
-                    document.getElementById('permEditVault').checked = !!perms.edit_vault;
+                    document.getElementById('permEditVault').checked = !!perms.permEditVault || !!perms.edit_vault;
                     document.getElementById('permViewReports').checked = !!perms.view_reports;
+                    document.getElementById('permViewRoutine').checked = !!perms.view_routine;
                     
                     togglePermissionCheckboxes(u.role);
                 }
@@ -3021,7 +3029,8 @@
                 document.getElementById('permViewVault'),
                 document.getElementById('permEditClients'),
                 document.getElementById('permEditVault'),
-                document.getElementById('permViewReports')
+                document.getElementById('permViewReports'),
+                document.getElementById('permViewRoutine')
             ];
             
             if (role === 'superadmin') {
@@ -3059,7 +3068,8 @@
                 view_vault: document.getElementById('permViewVault').checked,
                 edit_clients: document.getElementById('permEditClients').checked,
                 edit_vault: document.getElementById('permEditVault').checked,
-                view_reports: document.getElementById('permViewReports').checked
+                view_reports: document.getElementById('permViewReports').checked,
+                view_routine: document.getElementById('permViewRoutine').checked
             };
 
             const endpoint = id ? '/api/legacy?api=user_update' : '/api/legacy?api=user_create';
