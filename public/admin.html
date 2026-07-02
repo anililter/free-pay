@@ -1078,6 +1078,26 @@
     </style>
 </head>
 <body>
+    <!-- Giriş Yap (Login) Overlay -->
+    <div id="loginOverlay" style="position:fixed; top:0; left:0; width:100%; height:100%; background:hsl(var(--bg-base)); z-index:99999; display:none; align-items:center; justify-content:center; padding:20px;">
+        <div class="stat-card" style="width:100%; max-width:400px; padding:32px; box-shadow:var(--shadow-xl); border:1px solid hsl(var(--border-color)); background: white; border-radius: 12px;">
+            <div style="text-align:center; margin-bottom:24px;">
+                <h2 style="font-size:24px; font-weight:800; color:hsl(var(--primary)); margin-bottom:6px;">FreePay</h2>
+                <p style="font-size:14px; color:hsl(var(--text-secondary));">Lütfen kullanıcı adınız ve şifrenizle giriş yapın.</p>
+            </div>
+            <form onsubmit="handleLoginSubmit(event)" style="display:flex; flex-direction:column; gap:16px;">
+                <div class="form-group">
+                    <label class="form-label" for="loginUsername">Kullanıcı Adı</label>
+                    <input type="text" id="loginUsername" class="form-control" placeholder="Kullanıcı adı" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="loginPassword">Şifre</label>
+                    <input type="password" id="loginPassword" class="form-control" placeholder="Şifre" required>
+                </div>
+                <button type="submit" class="btn btn-primary" style="width:100%; padding:10px; margin-top:8px;">Giriş Yap</button>
+            </form>
+        </div>
+    </div>
 
     <div class="container">
         
@@ -1098,31 +1118,31 @@
 
         <!-- Navigation Tabs -->
         <div class="nav-tabs">
-            <button class="tab-btn active" onclick="switchTab('payments', this)">
+            <button id="tabBtnPayments" class="tab-btn active" onclick="switchTab('payments', this)">
                 <i data-lucide="calendar-check" style="width: 15px; height: 15px;"></i>
                 <span>Ödeme Takibi & Finans</span>
             </button>
-            <button class="tab-btn" onclick="switchTab('reports', this)">
+            <button id="tabBtnReports" class="tab-btn" onclick="switchTab('reports', this)">
                 <i data-lucide="bar-chart-3" style="width: 15px; height: 15px;"></i>
                 <span>Grafikler & Raporlar</span>
             </button>
-            <button class="tab-btn" onclick="switchTab('kasa', this)">
+            <button id="tabBtnKasa" class="tab-btn" onclick="switchTab('kasa', this)">
                 <i data-lucide="wallet" style="width: 15px; height: 15px;"></i>
                 <span>Kasa & Hesaplar</span>
             </button>
-            <button class="tab-btn" onclick="switchTab('routine', this)">
+            <button id="tabBtnRoutine" class="tab-btn" onclick="switchTab('routine', this)">
                 <i data-lucide="check-square" style="width: 15px; height: 15px;"></i>
                 <span>Günlük Kontrol</span>
             </button>
-            <button class="tab-btn" onclick="switchTab('clients', this)">
+            <button id="tabBtnClients" class="tab-btn" onclick="switchTab('clients', this)">
                 <i data-lucide="handshake" style="width: 15px; height: 15px;"></i>
                 <span>Müşteriler & Anlaşmalar</span>
             </button>
-            <button class="tab-btn" onclick="switchTab('settings', this)">
+            <button id="tabBtnSettings" class="tab-btn" onclick="switchTab('settings', this)">
                 <i data-lucide="settings" style="width: 15px; height: 15px;"></i>
                 <span>Sistem ve Ayarlar</span>
             </button>
-            <button class="tab-btn" onclick="switchTab('gemini', this)" style="display:none;">
+            <button id="tabBtnGemini" class="tab-btn" onclick="switchTab('gemini', this)" style="display:none;">
                 <i data-lucide="sparkles" style="width: 15px; height: 15px;"></i>
                 <span>Gemini Yapay Zeka</span>
             </button>
@@ -1593,6 +1613,34 @@
                     </div>
                 </div>
 
+                <!-- Kullanıcı Yönetimi Kartı -->
+                <div class="stat-card" style="padding: 28px;" id="settingsUserManagementCard">
+                    <h3 style="font-size: 17px; font-weight: 800; border-bottom: 1px solid hsl(var(--border-color)); padding-bottom: 12px; margin-bottom: 20px; display: flex; align-items: center; gap: 8px;">
+                        <i data-lucide="users" style="color:hsl(var(--primary)); width:20px; height:20px;"></i>
+                        <span>Kullanıcı Yönetimi & Yetkilendirme</span>
+                    </h3>
+                    <div style="display:flex; justify-content: flex-end; margin-bottom: 12px;">
+                        <button type="button" class="btn btn-primary" onclick="openUserModal()" style="font-size:12px; padding: 6px 12px; display:flex; align-items:center; gap:6px;">
+                            <i data-lucide="plus-circle" style="width:14px; height:14px;"></i> Yeni Kullanıcı Ekle
+                        </button>
+                    </div>
+                    <div class="table-responsive" style="border: 1px solid hsl(var(--border-color)); border-radius: 6px; overflow: hidden; background:white;">
+                        <table class="table" style="margin: 0; width: 100%; border-collapse: separate; border-spacing: 0;">
+                            <thead>
+                                <tr style="background-color: hsl(var(--bg-surface)); font-size:12px;">
+                                    <th style="font-weight: 600; padding: 10px; border-bottom: 1px solid hsl(var(--border-color));">Kullanıcı Adı</th>
+                                    <th style="font-weight: 600; padding: 10px; border-bottom: 1px solid hsl(var(--border-color));">Rol</th>
+                                    <th style="font-weight: 600; padding: 10px; border-bottom: 1px solid hsl(var(--border-color));">İzinler</th>
+                                    <th style="font-weight: 600; padding: 10px; border-bottom: 1px solid hsl(var(--border-color)); text-align:center; width:100px;">İşlem</th>
+                                </tr>
+                            </thead>
+                            <tbody id="usersTableBody">
+                                <!-- Users list -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
                 <div class="stat-card" style="padding: 24px; background: hsla(var(--primary-rgb), 0.05); border-color: hsla(var(--primary-rgb), 0.2);">
                     <h4 style="font-size:14px; font-weight:800; color:hsl(var(--text-primary)); margin-bottom:8px; display:flex; align-items:center; gap:8px;">
                         <i data-lucide="info" style="color:hsl(var(--primary)); width:16px; height:16px;"></i>
@@ -1843,6 +1891,66 @@
                 <button type="button" class="btn" style="background:hsl(var(--bg-base)); border:1px solid hsl(var(--border-color));" onclick="closeDatedNoteModal()">İptal</button>
                 <button type="button" class="btn btn-primary" onclick="saveDatedNote()">Kaydet</button>
             </div>
+        </div>
+    </div>
+
+    <!-- Kullanıcı Ekle/Düzenle Modal -->
+    <div class="modal-backdrop" id="userModal">
+        <div class="modal-card" style="max-width: 480px;">
+            <div class="modal-header">
+                <h3 class="modal-title" id="userModalTitle">Yeni Kullanıcı Ekle</h3>
+                <button class="modal-close" onclick="closeUserModal()"><i data-lucide="x" style="width:16px;height:16px;"></i></button>
+            </div>
+            <form id="userForm" onsubmit="saveUserForm(event)">
+                <input type="hidden" id="userIdInput">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label class="form-label" for="userUsername">Kullanıcı Adı</label>
+                        <input type="text" id="userUsername" class="form-control" placeholder="Kullanıcı adı" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="userPassword">Şifre</label>
+                        <input type="password" id="userPassword" class="form-control" placeholder="Şifre" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="userRole">Rol</label>
+                        <select id="userRole" class="form-control" onchange="togglePermissionCheckboxes(this.value)">
+                            <option value="user">User (Sınırlı Yetki)</option>
+                            <option value="admin">Admin (Tam Yetki)</option>
+                            <option value="superadmin">Super Admin (Tüm Yetkiler + Kullanıcı Yönetimi)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Erişim İzinleri</label>
+                        <div style="display:flex; flex-direction:column; gap:10px; background:hsla(var(--primary-rgb),0.03); padding:14px; border:1px solid hsl(var(--border-color)); border-radius:6px;" id="userPermissionsList">
+                            <div style="display:flex; align-items:center; gap:8px;">
+                                <input type="checkbox" id="permViewPayments" style="width:16px; height:16px;">
+                                <label for="permViewPayments" style="font-size:13px; font-weight:600; cursor:pointer;">Ödemeleri Görüntüle</label>
+                            </div>
+                            <div style="display:flex; align-items:center; gap:8px;">
+                                <input type="checkbox" id="permViewVault" style="width:16px; height:16px;">
+                                <label for="permViewVault" style="font-size:13px; font-weight:600; cursor:pointer;">Kasayı (Vault) Görüntüle</label>
+                            </div>
+                            <div style="display:flex; align-items:center; gap:8px;">
+                                <input type="checkbox" id="permEditClients" style="width:16px; height:16px;">
+                                <label for="permEditClients" style="font-size:13px; font-weight:600; cursor:pointer;">Müşteri Ekle / Düzenle / Sil</label>
+                            </div>
+                            <div style="display:flex; align-items:center; gap:8px;">
+                                <input type="checkbox" id="permEditVault" style="width:16px; height:16px;">
+                                <label for="permEditVault" style="font-size:13px; font-weight:600; cursor:pointer;">Kasa Transferi & Gelir/Gider İşlemleri</label>
+                            </div>
+                            <div style="display:flex; align-items:center; gap:8px;">
+                                <input type="checkbox" id="permViewReports" style="width:16px; height:16px;">
+                                <label for="permViewReports" style="font-size:13px; font-weight:600; cursor:pointer;">Raporlar ve Grafik Analizini Gör</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn" style="background:hsl(var(--bg-base)); border:1px solid hsl(var(--border-color));" onclick="closeUserModal()">İptal</button>
+                    <button type="submit" class="btn btn-primary">Kaydet</button>
+                </div>
+            </form>
         </div>
     </div>
 
@@ -2115,9 +2223,10 @@
         // Global fetch wrapper — tüm /api çağrılarına Basic Auth header ekler
         (function() {
             const _origFetch = window.fetch.bind(window);
-            // Credential: tarayıcı Basic Auth session'ından al, yoksa varsayılanı kullan
             function getAuthHeader() {
-                return 'Basic ' + btoa('admin:freelance1234');
+                const u = localStorage.getItem('freepay_user') || 'admin';
+                const p = localStorage.getItem('freepay_pass') || 'freelance1234';
+                return 'Basic ' + btoa(u + ':' + p);
             }
             window.fetch = function(input, init) {
                 const url = (typeof input === 'string' ? input : (input && input.url)) || '';
@@ -2129,7 +2238,14 @@
                     }
                     init.headers = headers;
                 }
-                return _origFetch(input, init);
+                return _origFetch(input, init).then(response => {
+                    if (response.status === 401 && !url.includes('current_user')) {
+                        localStorage.removeItem('freepay_user');
+                        localStorage.removeItem('freepay_pass');
+                        if (window.showLoginScreen) window.showLoginScreen();
+                    }
+                    return response;
+                });
             };
         })();
 
@@ -2732,6 +2848,273 @@
 
         // Status kontrolü yap
         setTimeout(window.checkGoogleTasksStatus, 1500);
+
+        // ---- Kullanıcı Yönetimi & Yetki Kontrolü ----
+        window.currentUserData = null;
+        window.usersListData = [];
+
+        window.showLoginScreen = function() {
+            document.getElementById('loginOverlay').style.display = 'flex';
+        };
+
+        window.hideLoginScreen = function() {
+            document.getElementById('loginOverlay').style.display = 'none';
+        };
+
+        window.handleLoginSubmit = async function(e) {
+            e.preventDefault();
+            const u = document.getElementById('loginUsername').value.trim();
+            const p = document.getElementById('loginPassword').value.trim();
+            
+            localStorage.setItem('freepay_user', u);
+            localStorage.setItem('freepay_pass', p);
+
+            const authed = await window.checkAuthentication();
+            if (authed) {
+                hideLoginScreen();
+                showToast('Giriş başarılı!', 'success');
+                if (window.initApp) window.initApp();
+                else window.location.reload();
+            } else {
+                localStorage.removeItem('freepay_user');
+                localStorage.removeItem('freepay_pass');
+                showToast('Hatalı kullanıcı adı veya şifre!', 'danger');
+            }
+        };
+
+        window.checkAuthentication = async function() {
+            try {
+                const res = await fetch('/api/legacy?api=current_user');
+                if (!res.ok) return false;
+                const data = await res.json();
+                if (data.success && data.user) {
+                    window.currentUserData = data.user;
+                    applyUserPermissions(data.user);
+                    return true;
+                }
+            } catch(e) {
+                console.error('Auth check error:', e);
+            }
+            return false;
+        };
+
+        function applyUserPermissions(user) {
+            const p = user.permissions || {};
+            
+            // Tab Visibility
+            document.getElementById('tabBtnPayments').style.display = p.view_payments ? 'flex' : 'none';
+            document.getElementById('tabBtnReports').style.display = p.view_reports ? 'flex' : 'none';
+            document.getElementById('tabBtnKasa').style.display = p.view_vault ? 'flex' : 'none';
+            document.getElementById('tabBtnRoutine').style.display = p.view_payments ? 'flex' : 'none';
+            
+            // Hide whole sections if forbidden
+            if (!p.view_payments && document.getElementById('tabViewPayments').classList.contains('active')) {
+                switchTab('clients');
+            }
+            if (!p.view_vault && document.getElementById('tabViewKasa')?.classList.contains('active')) {
+                switchTab('clients');
+            }
+
+            // User Management Card Visibility
+            const userCard = document.getElementById('settingsUserManagementCard');
+            if (userCard) {
+                userCard.style.display = (user.role === 'superadmin' || user.role === 'admin') ? 'block' : 'none';
+            }
+
+            // Client Modification Buttons
+            const clientAddBtn = document.querySelector('button[onclick="openClientModal()"]');
+            if (clientAddBtn) clientAddBtn.style.display = p.edit_clients ? 'flex' : 'none';
+
+            if (user.role === 'superadmin' || user.role === 'admin') {
+                window.loadUsersList();
+            }
+        }
+
+        window.loadUsersList = async function() {
+            try {
+                const res = await fetch('/api/legacy?api=users_list');
+                const data = await res.json();
+                if (data.success && data.users) {
+                    window.usersListData = data.users;
+                    renderUsersTable(data.users);
+                }
+            } catch(e) {
+                console.error(e);
+            }
+        };
+
+        function renderUsersTable(usersList) {
+            const tbody = document.getElementById('usersTableBody');
+            if (!tbody) return;
+            tbody.innerHTML = '';
+            
+            if (usersList.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:15px; color:hsl(var(--text-muted));">Kayıtlı kullanıcı bulunamadı.</td></tr>';
+                return;
+            }
+
+            usersList.forEach(u => {
+                const perms = u.permissions || {};
+                const permLabels = [];
+                if (perms.view_payments) permLabels.push('Ödemeler');
+                if (perms.view_vault) permLabels.push('Kasa');
+                if (perms.edit_clients) permLabels.push('Müşteri Yönetimi');
+                if (perms.edit_vault) permLabels.push('Kasa Yetkileri');
+                if (perms.view_reports) permLabels.push('Raporlar');
+                
+                const permStr = permLabels.length > 0 ? permLabels.join(', ') : 'Yetki yok';
+
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td style="padding:10px; font-weight:600;">${escapeHtml(u.username)}</td>
+                    <td style="padding:10px;"><span class="badge" style="background:hsla(var(--primary-rgb),0.1); color:hsl(var(--primary));">${escapeHtml(u.role)}</span></td>
+                    <td style="padding:10px; font-size:12px; color:hsl(var(--text-secondary));">${escapeHtml(permStr)}</td>
+                    <td style="padding:10px; text-align:center;">
+                        <div style="display:flex; gap:6px; justify-content:center;">
+                            <button class="btn btn-secondary" style="padding:4px 8px; font-size:11px;" onclick="openUserModal(${u.id})">Düzenle</button>
+                            <button class="btn btn-secondary" style="padding:4px 8px; font-size:11px; background:#ef4444; color:white; border:none;" onclick="deleteUser(${u.id})">Sil</button>
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        window.openUserModal = function(id = null) {
+            const modal = document.getElementById('userModal');
+            const title = document.getElementById('userModalTitle');
+            const form = document.getElementById('userForm');
+            
+            form.reset();
+            document.getElementById('userIdInput').value = id || '';
+            document.getElementById('userPassword').required = !id;
+            
+            if (id) {
+                title.textContent = 'Kullanıcıyı Düzenle';
+                const u = window.usersListData.find(x => x.id === id);
+                if (u) {
+                    document.getElementById('userUsername').value = u.username;
+                    document.getElementById('userRole').value = u.role;
+                    const perms = u.permissions || {};
+                    document.getElementById('permViewPayments').checked = !!perms.view_payments;
+                    document.getElementById('permViewVault').checked = !!perms.view_vault;
+                    document.getElementById('permEditClients').checked = !!perms.edit_clients;
+                    document.getElementById('permEditVault').checked = !!perms.edit_vault;
+                    document.getElementById('permViewReports').checked = !!perms.view_reports;
+                    
+                    togglePermissionCheckboxes(u.role);
+                }
+            } else {
+                title.textContent = 'Yeni Kullanıcı Ekle';
+                togglePermissionCheckboxes('user');
+            }
+            modal.classList.add('show');
+        };
+
+        window.closeUserModal = function() {
+            document.getElementById('userModal').classList.remove('show');
+        };
+
+        window.togglePermissionCheckboxes = function(role) {
+            const checkboxes = [
+                document.getElementById('permViewPayments'),
+                document.getElementById('permViewVault'),
+                document.getElementById('permEditClients'),
+                document.getElementById('permEditVault'),
+                document.getElementById('permViewReports')
+            ];
+            
+            if (role === 'superadmin') {
+                checkboxes.forEach(cb => {
+                    if (cb) {
+                        cb.checked = true;
+                        cb.disabled = true;
+                    }
+                });
+            } else if (role === 'admin') {
+                checkboxes.forEach(cb => {
+                    if (cb) {
+                        cb.checked = true;
+                        cb.disabled = false;
+                    }
+                });
+            } else {
+                checkboxes.forEach(cb => {
+                    if (cb) {
+                        cb.disabled = false;
+                    }
+                });
+            }
+        };
+
+        window.saveUserForm = async function(e) {
+            e.preventDefault();
+            const id = document.getElementById('userIdInput').value;
+            const username = document.getElementById('userUsername').value.trim();
+            const password = document.getElementById('userPassword').value.trim();
+            const role = document.getElementById('userRole').value;
+            
+            const permissions = {
+                view_payments: document.getElementById('permViewPayments').checked,
+                view_vault: document.getElementById('permViewVault').checked,
+                edit_clients: document.getElementById('permEditClients').checked,
+                edit_vault: document.getElementById('permEditVault').checked,
+                view_reports: document.getElementById('permViewReports').checked
+            };
+
+            const endpoint = id ? '/api/legacy?api=user_update' : '/api/legacy?api=user_create';
+            const payload = { username, role, permissions };
+            if (id) payload.id = id;
+            if (password) payload.password = password;
+
+            try {
+                const res = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showToast(id ? 'Kullanıcı güncellendi.' : 'Kullanıcı oluşturuldu.', 'success');
+                    closeUserModal();
+                    window.loadUsersList();
+                } else {
+                    showToast(data.error || 'Hata oluştu.', 'danger');
+                }
+            } catch(e) {
+                console.error(e);
+                showToast('Bağlantı hatası.', 'danger');
+            }
+        };
+
+        window.deleteUser = async function(id) {
+            if (!confirm('Bu kullanıcıyı silmek istediğinize emin misiniz?')) return;
+            try {
+                const res = await fetch('/api/legacy?api=user_delete', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ id })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showToast('Kullanıcı silindi.', 'success');
+                    window.loadUsersList();
+                } else {
+                    showToast(data.error || 'Silinemedi.', 'danger');
+                }
+            } catch(e) {
+                console.error(e);
+                showToast('Bağlantı hatası.', 'danger');
+            }
+        };
+
+        // Giriş durumunu kontrol et
+        (async function() {
+            const authed = await window.checkAuthentication();
+            if (!authed) {
+                window.showLoginScreen();
+            }
+        })();
 
         window.updateRoutineStatus = function(clientId, status) {
             if (!window.dailyStatusMap) window.dailyStatusMap = {};

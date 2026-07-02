@@ -52,3 +52,12 @@ export const vaultTransactions = sqliteTable('vault_transactions', {
   attachmentUrl: text('attachment_url'), // optional base64 or link to invoice image
   createdAt: text('created_at').notNull().$defaultFn(() => new Date().toISOString()),
 });
+
+export const users = sqliteTable('users', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  username: text('username').notNull().unique(),
+  password: text('password').notNull(),
+  role: text('role').notNull().default('user'), // 'superadmin', 'admin', 'user'
+  permissions: text('permissions').notNull().default('{}'), // JSON string: {"view_payments":true,"view_vault":true,"edit_clients":true,"view_reports":true,"edit_vault":true}
+  createdAt: text('created_at').notNull().$defaultFn(() => new Date().toISOString()),
+});

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
-import { clients, payments, settings, vaultTransactions } from '@/db/schema';
+import { clients, payments, settings, vaultTransactions, users } from '@/db/schema';
 import { eq, and, sql, asc, desc, gte, lte, inArray } from 'drizzle-orm';
 
 // ---------------------------------------------------------------------------
@@ -156,6 +156,56 @@ async function getGoogleAccessToken(): Promise<string | null> {
   return accessToken;
 }
 
+async function getCurrentUser(req: NextRequest) {
+  const basicAuth = req.headers.get('authorization');
+  if (!basicAuth) return null;
+
+  try {
+    const authValue = basicAuth.split(' ')[1];
+    const [username, password] = atob(authValue).split(':');
+
+    const expectedUser = process.env.PANEL_USER || 'admin';
+    const expectedPass = process.env.PANEL_PASS || 'freelance1234';
+
+    if (username === expectedUser && password === expectedPass) {
+      return {
+        username,
+        role: 'superadmin',
+        permissions: {
+          view_payments: true,
+          view_vault: true,
+          edit_clients: true,
+          view_reports: true,
+          edit_vault: true,
+        },
+      };
+    }
+
+    const [dbUser] = await db.select().from(users).where(eq(users.username, username));
+    if (dbUser && dbUser.password === password) {
+      let perms: Record<string, boolean> = {};
+      try {
+        perms = JSON.parse(dbUser.permissions || '{}');
+      } catch (e) {}
+
+      return {
+        username: dbUser.username,
+        role: dbUser.role,
+        permissions: {
+          view_payments: perms.view_payments ?? (dbUser.role === 'admin'),
+          view_vault: perms.view_vault ?? (dbUser.role === 'admin'),
+          edit_clients: perms.edit_clients ?? (dbUser.role === 'admin'),
+          view_reports: perms.view_reports ?? (dbUser.role === 'admin'),
+          edit_vault: perms.edit_vault ?? (dbUser.role === 'admin'),
+        },
+      };
+    }
+  } catch (e) {
+    console.error('Error in getCurrentUser:', e);
+  }
+  return null;
+}
+
 // ---------------------------------------------------------------------------
 // GET handler
 // ---------------------------------------------------------------------------
@@ -165,10 +215,12 @@ export async function GET(req: NextRequest) {
   const api = url.searchParams.get('api');
 
   try {
+    const u = await getCurrentUser(req);
     // -----------------------------------------------------------------------
     // clients_list
     // -----------------------------------------------------------------------
     if (api === 'clients_list') {
+      if (!u || !u.permissions.view_payments) return fail('Müşteri listesini görme yetkiniz yok', 403);
       const allClients = await db.select().from(clients).orderBy(asc(clients.paymentDay));
 
       // Count months with status = 'pasif' clients (passive_months = number of
@@ -200,6 +252,7 @@ export async function GET(req: NextRequest) {
     // list  – main payments listing with stats
     // -----------------------------------------------------------------------
     if (api === 'list') {
+      if (!u || !u.permissions.view_payments) return fail('Ödeme listesini görme yetkiniz yok', 403);
       // Period range params
       let periodStart = url.searchParams.get('period_start');
       let periodEnd = url.searchParams.get('period_end');
@@ -653,6 +706,7 @@ export async function GET(req: NextRequest) {
     // vault_stats
     // -----------------------------------------------------------------------
     if (api === 'vault_stats') {
+      if (!u || !u.permissions.view_vault) return fail('Kasa verilerini görme yetkiniz yok', 403);
       const allTx = await db.select().from(vaultTransactions).orderBy(desc(vaultTransactions.date), desc(vaultTransactions.id));
 
       const accountMap = new Map<string, {
@@ -721,6 +775,40 @@ export async function GET(req: NextRequest) {
       return ok({ lists: data.items || [] });
     }
 
+    // -----------------------------------------------------------------------
+    // current_user
+    // -----------------------------------------------------------------------
+    if (api === 'current_user') {
+      const u = await getCurrentUser(req);
+      if (!u) return fail('Yetkisiz erişim', 401);
+      return ok({ user: u });
+    }
+
+    // -----------------------------------------------------------------------
+    // users_list
+    // -----------------------------------------------------------------------
+    if (api === 'users_list') {
+      const u = await getCurrentUser(req);
+      if (!u || (u.role !== 'superadmin' && u.role !== 'admin')) {
+        return fail('Bu işlem için yetkiniz yok', 403);
+      }
+      const dbUsers = await db.select().from(users).orderBy(asc(users.username));
+      const cleanUsers = dbUsers.map(x => {
+        let perms = {};
+        try {
+          perms = JSON.parse(x.permissions || '{}');
+        } catch (e) {}
+        return {
+          id: x.id,
+          username: x.username,
+          role: x.role,
+          permissions: perms,
+          created_at: x.createdAt
+        };
+      });
+      return ok({ users: cleanUsers });
+    }
+
     return fail('Unknown API endpoint');
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Internal server error';
@@ -738,12 +826,14 @@ export async function POST(req: NextRequest) {
   const api = url.searchParams.get('api');
 
   try {
+    const u = await getCurrentUser(req);
     const body = await req.json();
 
     // -----------------------------------------------------------------------
     // client_create
     // -----------------------------------------------------------------------
     if (api === 'client_create') {
+      if (!u || !u.permissions.edit_clients) return fail('Müşteri ekleme yetkiniz yok', 403);
       const result = await db
         .insert(clients)
         .values({
@@ -770,6 +860,7 @@ export async function POST(req: NextRequest) {
     // client_update
     // -----------------------------------------------------------------------
     if (api === 'client_update') {
+      if (!u || !u.permissions.edit_clients) return fail('Müşteri güncelleme yetkiniz yok', 403);
       const clientId = parseInt(body.id, 10);
       if (!clientId) return fail('Missing client id');
 
@@ -797,6 +888,7 @@ export async function POST(req: NextRequest) {
     // vault_transaction_create
     // -----------------------------------------------------------------------
     if (api === 'vault_transaction_create') {
+      if (!u || !u.permissions.edit_vault) return fail('Kasa işlemi ekleme yetkiniz yok', 403);
       const { account_name, type, amount, currency, date, description, client_name, payment_id, attachment_url } = body;
       if (!account_name || !type || amount === undefined || !date) {
         return fail('Missing required fields for vault transaction');
@@ -845,6 +937,7 @@ export async function POST(req: NextRequest) {
     // client_delete
     // -----------------------------------------------------------------------
     if (api === 'client_delete') {
+      if (!u || !u.permissions.edit_clients) return fail('Müşteri silme yetkiniz yok', 403);
       const clientId = parseInt(body.id, 10);
       if (!clientId) return fail('Missing client id');
 
@@ -856,6 +949,7 @@ export async function POST(req: NextRequest) {
     // payment_delete
     // -----------------------------------------------------------------------
     if (api === 'payment_delete') {
+      if (!u || !u.permissions.edit_clients) return fail('Ödeme kaydı silme yetkiniz yok', 403);
       const clientId = parseInt(body.client_id, 10);
       const period: string = body.period;
       if (!clientId || !period) return fail('Missing client id or period');
@@ -1177,6 +1271,7 @@ export async function POST(req: NextRequest) {
     // vault_balance_adjust
     // -----------------------------------------------------------------------
     if (api === 'vault_balance_adjust') {
+      if (!u || !u.permissions.edit_vault) return fail('Kasa bakiye eşitleme yetkiniz yok', 403);
       const { account_name, target_balance } = body;
       if (!account_name || target_balance === undefined) {
         return fail('Missing account_name or target_balance');
@@ -1272,6 +1367,83 @@ export async function POST(req: NextRequest) {
 
       const data = await res.json();
       return ok({ task: data });
+    }
+
+    // -----------------------------------------------------------------------
+    // user_create
+    // -----------------------------------------------------------------------
+    if (api === 'user_create') {
+      const u = await getCurrentUser(req);
+      if (!u || (u.role !== 'superadmin' && u.role !== 'admin')) {
+        return fail('Bu işlem için yetkiniz yok', 403);
+      }
+
+      const { username, password, role, permissions } = body;
+      if (!username || !password) return fail('Kullanıcı adı ve şifre zorunludur');
+
+      const [existing] = await db.select().from(users).where(eq(users.username, username));
+      if (existing) return fail('Bu kullanıcı adı zaten alınmış');
+
+      await db.insert(users).values({
+        username: username.trim(),
+        password: password.trim(),
+        role: role || 'user',
+        permissions: JSON.stringify(permissions || {}),
+      });
+
+      return ok({ message: 'Kullanıcı oluşturuldu' });
+    }
+
+    // -----------------------------------------------------------------------
+    // user_update
+    // -----------------------------------------------------------------------
+    if (api === 'user_update') {
+      const u = await getCurrentUser(req);
+      if (!u || (u.role !== 'superadmin' && u.role !== 'admin')) {
+        return fail('Bu işlem için yetkiniz yok', 403);
+      }
+
+      const id = parseInt(body.id, 10);
+      if (!id) return fail('Kullanıcı ID\'si zorunludur');
+
+      const [existing] = await db.select().from(users).where(eq(users.id, id));
+      if (!existing) return fail('Kullanıcı bulunamadı');
+
+      if (u.role === 'admin' && (existing.role === 'superadmin' || body.role === 'superadmin')) {
+        return fail('Superadmin kullanıcılarını güncelleme yetkiniz yok', 403);
+      }
+
+      const updates: Record<string, any> = {};
+      if (body.username) updates.username = body.username.trim();
+      if (body.password) updates.password = body.password.trim();
+      if (body.role) updates.role = body.role;
+      if (body.permissions) updates.permissions = JSON.stringify(body.permissions);
+
+      await db.update(users).set(updates).where(eq(users.id, id));
+      return ok({ message: 'Kullanıcı güncellendi' });
+    }
+
+    // -----------------------------------------------------------------------
+    // user_delete
+    // -----------------------------------------------------------------------
+    if (api === 'user_delete') {
+      const u = await getCurrentUser(req);
+      if (!u || (u.role !== 'superadmin' && u.role !== 'admin')) {
+        return fail('Bu işlem için yetkiniz yok', 403);
+      }
+
+      const id = parseInt(body.id, 10);
+      if (!id) return fail('Kullanıcı ID\'si zorunludur');
+
+      const [existing] = await db.select().from(users).where(eq(users.id, id));
+      if (!existing) return fail('Kullanıcı bulunamadı');
+
+      if (u.role === 'admin' && existing.role === 'superadmin') {
+        return fail('Superadmin kullanıcısını silme yetkiniz yok', 403);
+      }
+
+      await db.delete(users).where(eq(users.id, id));
+      return ok({ message: 'Kullanıcı silindi' });
     }
 
     return fail('Unknown API endpoint');
